@@ -24,6 +24,8 @@ export interface AppDeps {
   /** 테스트 정보에 표시할 사용 모델 (AI 미설정이면 없음) */
   models?: ModelInfo;
   today: () => string;
+  /** 첫 화면 '명문 골프장' 섹션 목록 (data/premium-clubs.json). 없으면 섹션 없음 */
+  premiumClubs?: string[];
   /** IP별 1분 호출 한도 (OpenAI 비용·한도 보호). 기본값 DEFAULT_RATE_LIMITS */
   rateLimits?: RateLimits;
 }
@@ -83,7 +85,7 @@ class HttpError extends Error {
 
 const DATE_SUGGESTIONS = ["이번 주말", "다음 주 토요일", "날짜 상관없이 제일 싼 곳"];
 
-export function createApp({ source, parser, transcriber, speaker, models, today, rateLimits = DEFAULT_RATE_LIMITS }: AppDeps) {
+export function createApp({ source, parser, transcriber, speaker, models, today, premiumClubs = [], rateLimits = DEFAULT_RATE_LIMITS }: AppDeps) {
   const app = express();
   app.use(express.json({ limit: "100kb" }));
   const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_AUDIO_BYTES, files: 1 } });
@@ -144,7 +146,7 @@ export function createApp({ source, parser, transcriber, speaker, models, today,
   app.get("/api/featured", async (_req, res) => {
     const catalog = await source.catalog();
     const key = `${catalog.updatedAt.getTime()}|${today()}`;
-    if (featuredCache?.key !== key) featuredCache = { key, sections: await featuredSections(source, catalog, today()) };
+    if (featuredCache?.key !== key) featuredCache = { key, sections: await featuredSections(source, catalog, today(), premiumClubs) };
     res.json(featuredCache.sections);
   });
 

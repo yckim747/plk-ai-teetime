@@ -167,6 +167,16 @@ describe("첫 화면 추천 섹션", () => {
     const clubs = value.items.map((r) => r.teeTime.club);
     assert.equal(new Set(clubs.slice(0, 4)).size, 4, "앞쪽은 골프장 중복 없이");
   });
+  it("명문 골프장 섹션: 목록의 골프장만, 주말 평균 그린피가 높은 순, 맨 위", async () => {
+    const source = new MemorySource(ROWS);
+    const sections = await featuredSections(source, await source.catalog(), "2026-10-08", ["A컨트리클럽", "B골프클럽", "베어포트", "D컨트리클럽"]);
+    // 주말 오전 티타임이 있는 골프장(A·B)이 모두 명문 섹션에 나와서, 중복을 뺀 주말 섹션은 비어 생략된다
+    assert.deepEqual(sections.map((s) => s.id), ["premium", "value"]);
+    const premium = sections[0];
+    // D는 오전(06~11시) 티타임이 없어 빠지고, A(주말 평균 24.3만) → B(18만) → 베어포트(주말 없음, 평균 12만) 순
+    assert.deepEqual(premium.items.map((r) => r.teeTime.club), ["A컨트리클럽", "B골프클럽", "베어포트리조트CC(구.웅포)"]);
+    assert.deepEqual(premium.criteria.clubs, ["A컨트리클럽", "B골프클럽", "베어포트리조트CC(구.웅포)"]);
+  });
   it("/api/featured", async () => {
     const app = createApp({ source: new MemorySource(ROWS), today: () => "2026-10-08" });
     const server = app.listen(0);

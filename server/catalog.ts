@@ -19,9 +19,10 @@ function aliasKeys(club: string): string[] {
 
 /** 고객이 말한 골프장 이름을 데이터의 정식명으로 찾는다. 정확한 별칭 일치가 우선, 없으면 부분 일치. */
 export function matchClub(query: string, clubs: Iterable<string>): string[] {
+  const list = [...clubs];
+  if (list.includes(query.trim())) return [query.trim()]; // 정식 이름 그대로면 바로
   const q = clubKey(query);
   if (q.length < 2) return [];
-  const list = [...clubs];
   const exact = list.filter((c) => aliasKeys(c).includes(q));
   if (exact.length) return exact;
   return list.filter((c) => aliasKeys(c).some((k) => k.length >= 2 && (k.includes(q) || q.includes(k))));

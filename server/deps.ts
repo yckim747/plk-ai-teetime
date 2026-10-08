@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import premium from "../data/premium-clubs.json" with { type: "json" };
 import type { AppDeps } from "./app";
 import { todaySeoul } from "./dates";
 import { OpenAIQueryParser } from "./nlu/parseQuery";
@@ -19,6 +20,7 @@ export function createDeps(csvPath: string, dataUpdatedAt?: Date): AppDeps {
   return {
     models: client ? models : undefined,
     source: new CsvSource(csvPath, dataUpdatedAt),
+    premiumClubs: premium.clubs,
     parser: client && new OpenAIQueryParser(client, models.parse),
     transcriber: client && new OpenAITranscriber(client, models.stt),
     speaker: client && new OpenAISpeaker(client, models.tts, env.OPENAI_TTS_VOICE || "nova"),
