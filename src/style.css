@@ -1055,3 +1055,23 @@ button:disabled {
 .filter-actions .btn.primary {
   flex: 1;
 }
+
+/* 앱 안 브라우저 안내 */
+.inapp-banner {
+  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--warn-soft);
+  color: var(--warn);
+  font-size: 0.9rem;
+  font-weight: 600;
+  word-break: keep-all;
+}
+.inapp-banner .btn {
+  padding: 8px 14px;
+  font-size: 0.88rem;
+}

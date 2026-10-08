@@ -314,6 +314,26 @@ describe("HTTP API", () => {
     });
   });
 
+  it("같은 IP가 1분 한도를 넘게 문의하면 429", async () => {
+    const parser: QueryParser = {
+      async parse() {
+        return { criteria: c({ dates: ["2026-10-10"] }), anyDate: false, needsClarification: false, question: null, suggestions: [], nearRegions: [] };
+      },
+    };
+    const app = createApp({ source: new MemorySource(ROWS), parser, today: () => "2026-10-08", rateLimits: { query: 2, transcribe: 2, speak: 2 } });
+    const server = app.listen(0);
+    try {
+      const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api/query`;
+      const codes = [];
+      for (let i = 0; i < 3; i++) codes.push((await post(url, { message: "주말" })).status);
+      assert.deepEqual(codes, [200, 200, 429]);
+      const other = await fetch(url, { method: "POST", headers: { "content-type": "application/json", "x-real-ip": "10.0.0.9" }, body: JSON.stringify({ message: "주말" }) });
+      assert.equal(other.status, 200, "다른 접속자는 영향 없음");
+    } finally {
+      server.close();
+    }
+  });
+
   it("잘못된 요청은 400", async () => {
     await withServer(undefined, async (base) => {
       assert.equal((await post(`${base}/api/search`, { criteria: { dates: ["10월"] } })).status, 400);

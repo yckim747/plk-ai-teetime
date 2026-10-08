@@ -39,6 +39,8 @@ npm run dev                 # http://localhost:5173 (API는 3001)
 - 화면은 Vercel CDN에서, `/api/*`는 서버 함수(`server/vercel.ts`) 하나가 처리합니다. 티타임 CSV는 함수와 함께 배포됩니다.
 - 배포: `npm run deploy:vercel` (처음 한 번 `npx vercel login`, `npx vercel link` 필요). GitHub에 푸시해도 자동 배포되지 않습니다.
 - 환경변수는 Vercel 프로젝트 설정(Production)에 둡니다: `OPENAI_API_KEY`, `OPENAI_MODEL`.
+- 카카오톡 안에서 열리면 사파리·크롬으로 자동 전환을 시도합니다(앱 안 브라우저는 마이크·소리가 막히기 쉬움). 링크 미리보기 이미지는 `public/og.png`입니다.
+- OpenAI를 쓰는 API는 IP별 1분 호출 한도가 있습니다(문의 20 · 음성 인식 20 · 음성 답변 40, `DEFAULT_RATE_LIMITS`).
 - **데이터(CSV)를 바꾸면 다시 배포해야 반영됩니다.** 서버리스라 파일 자동 재적재는 로컬·Codespaces에서만 동작합니다.
 
 ## GitHub에서 테스트하기

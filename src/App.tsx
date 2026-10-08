@@ -11,7 +11,9 @@ import { Header } from "./components/Header";
 import { Home } from "./components/Home";
 import { Sheet } from "./components/Sheet";
 import { TeeTimeDetail } from "./components/TeeTimeDetail";
+import { InAppBanner } from "./components/InAppBanner";
 import { MicIcon } from "./icons";
+import { autoOpenExternalOnce } from "./inApp";
 import { playAck, speak, stopSpeaking, unlockAudio } from "./speech";
 
 interface UserMsg {
@@ -63,6 +65,8 @@ export function App() {
   const pushError = useCallback((text: string) => push({ role: "assistant", text, error: true }), [push]);
 
   useEffect(() => {
+    // 카카오톡 안에서 열렸으면 사파리·크롬으로 다시 열기 (앱 안에서는 마이크·소리가 막히기 쉬움)
+    autoOpenExternalOnce();
     api.catalog().then(setCatalog, (e: Error) => pushError(`데이터를 불러오지 못했습니다: ${e.message}`));
     api.featured().then(setFeatured, () => setFeatured([]));
   }, [pushError]);
@@ -165,8 +169,21 @@ export function App() {
 
       <main className="main">
         <div className="column">
+          <InAppBanner />
           {messages.length === 0 ? (
-            <Home featured={featured} aiEnabled={aiEnabled} onSelect={select} onMore={search} onAsk={ask} onOpenFilter={openFilter} />
+            <Home
+              featured={featured}
+              aiEnabled={aiEnabled}
+              expiredNotice={
+                catalog && catalog.today > catalog.dateTo
+                  ? `시연용 데이터 기간(${formatDate(catalog.dateFrom)}~${formatDate(catalog.dateTo)})이 지났어요. 새 데이터로 갱신이 필요합니다.`
+                  : null
+              }
+              onSelect={select}
+              onMore={search}
+              onAsk={ask}
+              onOpenFilter={openFilter}
+            />
           ) : (
             <div className="thread">
               {messages.map((m, i) =>

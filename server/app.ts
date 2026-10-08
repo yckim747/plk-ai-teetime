@@ -24,7 +24,18 @@ export interface AppDeps {
   /** 테스트 정보에 표시할 사용 모델 (AI 미설정이면 없음) */
   models?: ModelInfo;
   today: () => string;
+  /** IP별 1분 호출 한도 (OpenAI 비용·한도 보호). 기본값 DEFAULT_RATE_LIMITS */
+  rateLimits?: RateLimits;
 }
+
+export interface RateLimits {
+  query: number;
+  transcribe: number;
+  speak: number;
+}
+
+/** 시연하는 사람에게는 걸리지 않을 만큼 넉넉하게, 자동 반복 호출만 막는다 */
+export const DEFAULT_RATE_LIMITS: RateLimits = { query: 20, transcribe: 20, speak: 40 };
 
 const MAX_AUDIO_BYTES = 10 * 1024 * 1024;
 
@@ -39,6 +50,28 @@ const QueryBody = z.object({
 const SearchBody = z.object({ criteria: SearchCriteriaSchema });
 const SpeakBody = z.object({ text: z.string().trim().min(1).max(600) });
 
+/**
+ * IP별 1분 호출 수 제한 (메모리 방식). 서버리스에서는 인스턴스마다 따로 세므로 대략적인 보호다.
+ * Vercel이 넣어 주는 x-real-ip / x-forwarded-for로 접속자를 구분한다.
+ */
+function rateLimit(limit: number, windowMs = 60_000) {
+  const hits = new Map<string, number[]>();
+  return (req: Request, _res: Response, next: NextFunction) => {
+    const forwarded = req.headers["x-forwarded-for"];
+    const ip = (req.headers["x-real-ip"] as string | undefined) ?? (typeof forwarded === "string" ? forwarded.split(",")[0].trim() : undefined) ?? req.socket.remoteAddress ?? "unknown";
+    const now = Date.now();
+    const recent = (hits.get(ip) ?? []).filter((t) => now - t < windowMs);
+    if (recent.length >= limit) {
+      next(new HttpError(429, "요청이 너무 많아요. 잠시 후 다시 시도해 주세요."));
+      return;
+    }
+    recent.push(now);
+    hits.set(ip, recent);
+    if (hits.size > 5000) hits.clear(); // 메모리 보호
+    next();
+  };
+}
+
 class HttpError extends Error {
   constructor(
     readonly status: number,
@@ -50,7 +83,7 @@ class HttpError extends Error {
 
 const DATE_SUGGESTIONS = ["이번 주말", "다음 주 토요일", "날짜 상관없이 제일 싼 곳"];
 
-export function createApp({ source, parser, transcriber, speaker, models, today }: AppDeps) {
+export function createApp({ source, parser, transcriber, speaker, models, today, rateLimits = DEFAULT_RATE_LIMITS }: AppDeps) {
   const app = express();
   app.use(express.json({ limit: "100kb" }));
   const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_AUDIO_BYTES, files: 1 } });
@@ -122,7 +155,7 @@ export function createApp({ source, parser, transcriber, speaker, models, today 
   });
 
   /** 자연어 문의 → 조건 추출 → 검색·추천 */
-  app.post("/api/query", async (req, res) => {
+  app.post("/api/query", rateLimit(rateLimits.query), async (req, res) => {
     if (!parser) throw new HttpError(503, "AI 기능이 설정되지 않았습니다(OPENAI_API_KEY). 수동 필터로 검색해 주세요.");
     const { message, prevCriteria, history } = QueryBody.parse(req.body);
     const catalog = await source.catalog();
@@ -149,7 +182,7 @@ export function createApp({ source, parser, transcriber, speaker, models, today 
   });
 
   /** 음성(webm/mp4 등) → 텍스트. 음성은 메모리에서만 처리하고 저장하지 않는다. */
-  app.post("/api/transcribe", upload.single("audio"), async (req, res) => {
+  app.post("/api/transcribe", rateLimit(rateLimits.transcribe), upload.single("audio"), async (req, res) => {
     if (!transcriber) throw new HttpError(503, "음성 인식이 설정되지 않았습니다(OPENAI_API_KEY).");
     if (!req.file?.buffer.length) throw new HttpError(400, "음성 파일이 비어 있습니다.");
     const catalog = await source.catalog();
@@ -161,7 +194,7 @@ export function createApp({ source, parser, transcriber, speaker, models, today 
    * 답변 문장 → 음성(PCM 스트림). 만드는 대로 흘려보내서 화면이 받는 즉시 재생한다.
    * (전체 음성을 다 만든 뒤 보내면 첫 소리까지 3~6초가 걸린다)
    */
-  app.post("/api/speak", async (req, res) => {
+  app.post("/api/speak", rateLimit(rateLimits.speak), async (req, res) => {
     if (!speaker) throw new HttpError(503, "음성 답변이 설정되지 않았습니다(OPENAI_API_KEY).");
     const { text } = SpeakBody.parse(req.body);
     const audio = Readable.fromWeb((await speaker.stream(text)) as NodeReadableStream<Uint8Array>);

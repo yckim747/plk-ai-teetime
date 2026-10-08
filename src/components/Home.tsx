@@ -7,6 +7,8 @@ const PROMPTS = ["이번 주말 수도권 오전", "다음 주 토요일 제주�
 interface Props {
   featured: FeaturedSection[] | null;
   aiEnabled: boolean;
+  /** 데이터 기간이 지났을 때 안내 (빈 화면을 고장으로 오해하지 않게) */
+  expiredNotice: string | null;
   onSelect: (rec: Recommendation) => void;
   onMore: (criteria: SearchCriteria, note: string) => void;
   onAsk: (text: string) => void;
@@ -14,7 +16,7 @@ interface Props {
 }
 
 /** 첫 화면: 인사 → 바로 고를 수 있는 추천 티타임 → 물어보기 예시 */
-export function Home({ featured, aiEnabled, onSelect, onMore, onAsk, onOpenFilter }: Props) {
+export function Home({ featured, aiEnabled, expiredNotice, onSelect, onMore, onAsk, onOpenFilter }: Props) {
   return (
     <section className="home">
       <div className="greet">
@@ -26,6 +28,7 @@ export function Home({ featured, aiEnabled, onSelect, onMore, onAsk, onOpenFilte
           {aiEnabled ? "또는 조건을 골라서 찾기 ›" : "조건을 골라서 찾기 ›"}
         </button>
       </div>
+      {expiredNotice && <p className="notice">{expiredNotice}</p>}
 
       {featured === null ? (
         <div className="feat">
