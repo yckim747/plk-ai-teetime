@@ -6,6 +6,7 @@ import { AllResultsSheet } from "./components/AllResultsSheet";
 import { AssistantMessage, type AssistantMsg } from "./components/AssistantMessage";
 import { Composer } from "./components/Composer";
 import { DevInfo } from "./components/DevInfo";
+import { FilterSheet } from "./components/FilterSheet";
 import { Header } from "./components/Header";
 import { Home } from "./components/Home";
 import { Sheet } from "./components/Sheet";
@@ -20,7 +21,7 @@ interface UserMsg {
   voice?: boolean;
 }
 type Msg = UserMsg | AssistantMsg;
-type SheetState = { kind: "detail"; rec: Recommendation } | { kind: "all"; result: SearchResult } | null;
+type SheetState = { kind: "detail"; rec: Recommendation } | { kind: "all"; result: SearchResult } | { kind: "filter" } | null;
 
 const VOICE_REPLY_KEY = "plk.voiceReply";
 /** 맥락 이해용으로 AI에 넘기는 최근 대화 수 */
@@ -149,6 +150,7 @@ export function App() {
       `${formatDate(t.date)} ${t.region} ${t.time} 전후 비슷한 티타임`,
     );
   const select = (rec: Recommendation) => setSheet({ kind: "detail", rec });
+  const openFilter = () => setSheet({ kind: "filter" });
 
   return (
     <div className="app">
@@ -157,7 +159,7 @@ export function App() {
       <main className="main">
         <div className="column">
           {messages.length === 0 ? (
-            <Home featured={featured} aiEnabled={aiEnabled} onSelect={select} onMore={search} onAsk={ask} />
+            <Home featured={featured} aiEnabled={aiEnabled} onSelect={select} onMore={search} onAsk={ask} onOpenFilter={openFilter} />
           ) : (
             <div className="thread">
               {messages.map((m, i) =>
@@ -175,12 +177,14 @@ export function App() {
                     isLast={i === messages.length - 1}
                     busy={busy}
                     canSpeak={aiEnabled}
+                    canAsk={aiEnabled}
                     onSpeak={playSpeech}
                     onSelect={select}
                     onShowAll={(result) => setSheet({ kind: "all", result })}
                     onSearch={search}
                     onAsk={ask}
                     onNewChat={newChat}
+                    onOpenFilter={openFilter}
                   />
                 ),
               )}
@@ -197,15 +201,20 @@ export function App() {
               <div ref={threadEnd} className="thread-end" aria-hidden />
             </div>
           )}
-          <DevInfo catalog={catalog} busy={busy} open={devOpen} onToggle={setDevOpen} onSearch={search} />
+          <DevInfo catalog={catalog} open={devOpen} onToggle={setDevOpen} />
         </div>
       </main>
 
-      <Composer disabled={!aiEnabled} busy={busy} onSend={ask} onError={pushError} />
+      <Composer disabled={!aiEnabled} busy={busy} onSend={ask} onError={pushError} onOpenFilter={openFilter} />
 
       {sheet?.kind === "detail" && (
         <Sheet title="티타임 상세" onClose={() => setSheet(null)}>
           <TeeTimeDetail rec={sheet.rec} onMoreAtClub={moreAtClub} onSimilar={similar} onClose={() => setSheet(null)} />
+        </Sheet>
+      )}
+      {sheet?.kind === "filter" && catalog && (
+        <Sheet title="조건으로 찾기" onClose={() => setSheet(null)}>
+          <FilterSheet catalog={catalog} initial={criteria} onSearch={search} />
         </Sheet>
       )}
       {sheet?.kind === "all" && (

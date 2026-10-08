@@ -969,42 +969,98 @@ button:disabled {
   margin: 0;
   padding-left: 18px;
 }
-.filter {
+
+/* ===== 조건으로 찾기 ===== */
+.filter-btn {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  display: grid;
+  place-items: center;
+}
+.filter-btn:hover:not(:disabled) {
+  border-color: var(--brand);
+  color: var(--brand-text);
+}
+.greet-link {
+  margin-top: 6px;
+}
+.fallback-btn {
+  align-self: flex-start;
+}
+.fgroup {
+  margin-bottom: 20px;
+}
+.fgroup h3 {
+  font-size: 0.92rem;
+  margin-bottom: 8px;
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+}
+.fgroup h3 .muted {
+  font-size: 0.8rem;
+}
+.fchips {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
-  align-items: flex-end;
-  padding: 12px;
+  gap: 6px;
+}
+.fchips + .fchips {
+  margin-top: 8px;
+}
+.fchips.scroll {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  margin-left: -20px;
+  margin-right: -20px;
+  padding: 0 20px 4px;
+  scrollbar-width: none;
+}
+.fchips.scroll::-webkit-scrollbar {
+  display: none;
+}
+.fchip {
+  flex: none;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  border-radius: 999px;
+  padding: 7px 13px;
+  font-size: 0.88rem;
+  white-space: nowrap;
+}
+.fchip.on {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: #fff;
+}
+.fchip-sub {
+  margin-left: 4px;
+  font-size: 0.74rem;
+  opacity: 0.75;
+}
+.fselect {
+  width: 100%;
   border: 1px solid var(--line);
   border-radius: 12px;
-}
-.filter label {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  font-size: 0.78rem;
-}
-.filter select,
-.filter input {
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 6px 8px;
+  padding: 10px 12px;
   background: var(--bg);
-  min-width: 6.5rem;
-  max-width: 100%;
+  font-size: 16px;
 }
-.filter .row {
+.filter-actions {
+  position: sticky;
+  bottom: 0;
   display: flex;
-  gap: 4px;
+  gap: 8px;
+  padding: 12px 0 2px;
+  background: var(--bg);
 }
-.filter .row select {
-  min-width: 5rem;
+.filter-actions .btn.ghost {
+  flex: 0 0 96px;
 }
-.primary {
-  background: var(--brand);
-  color: #fff;
-  border: 0;
-  border-radius: 10px;
-  padding: 8px 16px;
-  font-weight: 600;
+.filter-actions .btn.primary {
+  flex: 1;
 }

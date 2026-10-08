@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { CloseIcon, MicIcon, SendIcon, StopIcon } from "../icons";
+import { CloseIcon, MicIcon, SendIcon, SlidersIcon, StopIcon } from "../icons";
 import { useVoiceRecorder } from "../voice/useVoiceRecorder";
 
 const BAR_SHAPE = [0.35, 0.6, 0.85, 1, 0.85, 0.6, 0.35];
@@ -9,12 +9,14 @@ interface Props {
   busy: boolean;
   onSend: (text: string, viaVoice: boolean) => void;
   onError: (message: string) => void;
+  /** 조건을 눌러서 고르는 시트 열기 (AI 없이 동작) */
+  onOpenFilter: () => void;
 }
 
 /**
  * 하단 고정 입력창. 🎤이 주 버튼이고, 녹음 중에는 입력창 자체가 음성 파형·취소·바로 검색으로 바뀐다.
  */
-export function Composer({ disabled, busy, onSend, onError }: Props) {
+export function Composer({ disabled, busy, onSend, onError, onOpenFilter }: Props) {
   const [text, setText] = useState("");
   const voice = useVoiceRecorder({ onText: (t) => onSend(t, true), onError });
   const recording = voice.state === "recording";
@@ -31,6 +33,11 @@ export function Composer({ disabled, busy, onSend, onError }: Props) {
   return (
     <div className="composer-wrap">
       <form className="composer" onSubmit={submit}>
+        {!recording && !transcribing && (
+          <button type="button" className="filter-btn" onClick={onOpenFilter} disabled={busy} aria-label="조건으로 찾기" title="조건으로 찾기">
+            <SlidersIcon width={20} height={20} />
+          </button>
+        )}
         {recording || transcribing ? (
           <div className={`pill listening${transcribing ? " transcribing" : ""}`} role="status">
             {recording && (
@@ -54,7 +61,7 @@ export function Composer({ disabled, busy, onSend, onError }: Props) {
             <input
               value={text}
               onChange={(e) => setText(e.target.value)}
-              placeholder={disabled ? "지금은 AI 문의를 쓸 수 없어요" : "말하거나 입력하세요"}
+              placeholder={disabled ? "왼쪽 조건 버튼으로 찾아 주세요" : "말하거나 입력하세요"}
               disabled={disabled}
               maxLength={500}
               enterKeyHint="search"

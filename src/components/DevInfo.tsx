@@ -1,13 +1,10 @@
 import { formatDate } from "../../shared/format";
-import type { CatalogInfo, SearchCriteria } from "../../shared/types";
-import { ManualFilter } from "./ManualFilter";
+import type { CatalogInfo } from "../../shared/types";
 
 interface Props {
   catalog: CatalogInfo | null;
-  busy: boolean;
   open: boolean;
   onToggle: (open: boolean) => void;
-  onSearch: (c: SearchCriteria, note: string) => void;
 }
 
 const TRY = [
@@ -20,7 +17,7 @@ const TRY = [
 ];
 
 /** 페이지 맨 아래: 개발·검수 담당자용 정보 (기본 접힘) */
-export function DevInfo({ catalog, busy, open, onToggle, onSearch }: Props) {
+export function DevInfo({ catalog, open, onToggle }: Props) {
   return (
     <details className="devinfo" open={open} onToggle={(e) => onToggle(e.currentTarget.open)}>
       <summary>테스트 정보 (개발·검수용)</summary>
@@ -54,10 +51,9 @@ export function DevInfo({ catalog, busy, open, onToggle, onSearch }: Props) {
               <li key={t}>{t}</li>
             ))}
           </ul>
-          <h4>직접 검색 (AI 없이)</h4>
-          <ManualFilter catalog={catalog} initial={null} onSearch={(c) => onSearch(c, "필터로 검색")} disabled={busy} />
           <h4>알려진 제한</h4>
           <ul>
+            <li>AI가 꺼져 있거나 응답이 실패해도 입력창 왼쪽 '조건' 버튼으로 검색할 수 있습니다(AI를 쓰지 않음).</li>
             <li>예약 요청은 데모 화면입니다. 실제 예약·저장은 되지 않습니다.</li>
             <li>그린피 0원 데이터는 "그린피 문의"로 표시하고, 예산 조건이 있으면 제외합니다.</li>
             <li>음성 답변은 결과보다 약 3~6초 늦게 재생됩니다. 음성 인식이 날짜(예: 십일/십이일)를 잘못 듣는 경우가 드물게 있습니다.</li>

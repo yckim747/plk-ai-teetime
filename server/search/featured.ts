@@ -1,17 +1,12 @@
 import type { FeaturedSection, SearchCriteria } from "../../shared/types";
-import { addDays, dateRange, formatDate, weekdayIndex } from "../dates";
+import { upcomingWeekend } from "../../shared/format";
+import { addDays, dateRange, formatDate } from "../dates";
 import type { CatalogData, TeeTimeSource } from "../source/TeeTimeSource";
 import { pickTop, rankTeeTimes } from "./recommend";
 
 const PER_SECTION = 6;
 
-/** 오늘 이후 가장 가까운 주말(오늘이 일요일이면 오늘만) 중 데이터 기간 안의 날짜 */
-export function upcomingWeekend(start: string): string[] {
-  if (weekdayIndex(start) === 0) return [start];
-  let sat = start;
-  while (weekdayIndex(sat) !== 6) sat = addDays(sat, 1);
-  return [sat, addDays(sat, 1)];
-}
+export { upcomingWeekend };
 
 /**
  * 첫 화면 추천 섹션. 고객이 묻기 전에 바로 고를 수 있는 실제 티타임을 고른다.

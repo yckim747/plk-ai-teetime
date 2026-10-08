@@ -20,18 +20,21 @@ interface Props {
   isLast: boolean;
   busy: boolean;
   canSpeak: boolean;
+  /** AI 문의 가능 여부 (꺼져 있으면 AI가 필요한 후속 질문 칩을 숨김) */
+  canAsk: boolean;
   onSpeak: (text: string) => void;
   onSelect: (rec: Recommendation) => void;
   onShowAll: (result: SearchResult) => void;
   onSearch: (criteria: SearchCriteria, note: string) => void;
   onAsk: (text: string) => void;
   onNewChat: () => void;
+  onOpenFilter: () => void;
 }
 
 const FOLLOW_UPS = ["좀 더 늦게", "좀 더 일찍", "더 저렴한 곳"];
 
 /** AI 답변: 말풍선 없이 전체 폭. 결과 카드·조건·후속 질문을 답변 안에 함께 보여준다. */
-export function AssistantMessage({ msg, isLast, busy, canSpeak, onSpeak, onSelect, onShowAll, onSearch, onAsk, onNewChat }: Props) {
+export function AssistantMessage({ msg, isLast, busy, canSpeak, canAsk, onSpeak, onSelect, onShowAll, onSearch, onAsk, onNewChat, onOpenFilter }: Props) {
   const r = msg.result;
   const chips = r ? criteriaChips(r.criteria) : [];
 
@@ -45,6 +48,11 @@ export function AssistantMessage({ msg, isLast, busy, canSpeak, onSpeak, onSelec
           </button>
         )}
       </div>
+      {msg.error && (
+        <button type="button" className="btn ghost fallback-btn" onClick={onOpenFilter}>
+          조건으로 직접 찾기
+        </button>
+      )}
       {msg.notices?.map((n) => (
         <p key={n} className="notice">
           {n}
@@ -106,7 +114,7 @@ export function AssistantMessage({ msg, isLast, busy, canSpeak, onSpeak, onSelec
 
       {isLast && !busy && (
         <div className="chips">
-          {(msg.suggestions?.length ? msg.suggestions : r && r.total > 0 ? FOLLOW_UPS : []).map((s) => (
+          {(!canAsk ? [] : msg.suggestions?.length ? msg.suggestions : r && r.total > 0 ? FOLLOW_UPS : []).map((s) => (
             <button key={s} type="button" className="chip" onClick={() => onAsk(s)}>
               {s}
             </button>

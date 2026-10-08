@@ -10,17 +10,21 @@ interface Props {
   onSelect: (rec: Recommendation) => void;
   onMore: (criteria: SearchCriteria, note: string) => void;
   onAsk: (text: string) => void;
+  onOpenFilter: () => void;
 }
 
 /** 첫 화면: 인사 → 바로 고를 수 있는 추천 티타임 → 물어보기 예시 */
-export function Home({ featured, aiEnabled, onSelect, onMore, onAsk }: Props) {
+export function Home({ featured, aiEnabled, onSelect, onMore, onAsk, onOpenFilter }: Props) {
   return (
     <section className="home">
       <div className="greet">
         <h1>어떤 티타임을 찾으세요?</h1>
         <p>
-          {aiEnabled ? "아래 마이크 버튼을 누르고 말하거나 입력하면, 실시간 잔여 티타임에서 찾아드려요." : "지금은 AI 문의를 쓸 수 없어요. 아래 추천 티타임을 이용해 주세요."}
+          {aiEnabled ? "아래 마이크 버튼을 누르고 말하거나 입력하면, 실시간 잔여 티타임에서 찾아드려요." : "지금은 말로 하는 문의를 쓸 수 없어요. 조건을 골라서 찾거나 아래 추천 티타임을 이용해 주세요."}
         </p>
+        <button type="button" className="link greet-link" onClick={onOpenFilter}>
+          {aiEnabled ? "또는 조건을 골라서 찾기 ›" : "조건을 골라서 찾기 ›"}
+        </button>
       </div>
 
       {featured === null ? (
