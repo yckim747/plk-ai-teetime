@@ -250,6 +250,23 @@ button:disabled {
 .tee-card:hover {
   border-color: var(--brand);
 }
+/* 답변에서 말한 추천 티타임 */
+.tee-card.highlight {
+  border: 2px solid var(--brand);
+  padding: 11px;
+  background: color-mix(in srgb, var(--brand-soft) 55%, var(--card));
+}
+.tc-badge {
+  align-self: flex-start;
+  margin-bottom: 2px;
+  background: var(--brand);
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1;
+  padding: 4px 7px;
+  border-radius: 999px;
+}
 .tee-card:active {
   transform: scale(0.98);
 }

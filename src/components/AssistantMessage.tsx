@@ -77,8 +77,9 @@ export function AssistantMessage({ msg, isLast, busy, canSpeak, canAsk, onSpeak,
       {r && r.total > 0 && (
         <>
           <Carousel label="추천 티타임">
-            {r.recommendations.map((rec) => (
-              <TeeCard key={rec.teeTime.id} rec={rec} onSelect={onSelect} />
+            {/* 첫 번째 카드가 답변 문장·음성에서 말한 추천 티타임 */}
+            {r.recommendations.map((rec, i) => (
+              <TeeCard key={rec.teeTime.id} rec={rec} highlight={i === 0} onSelect={onSelect} />
             ))}
           </Carousel>
           <button type="button" className="all-btn" onClick={() => onShowAll(r)}>
