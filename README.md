@@ -33,7 +33,7 @@ npm run dev                 # http://localhost:5173 (API는 3001)
 
 | 방법 | 용도 | 준비 |
 |---|---|---|
-| **Codespaces** | 브라우저에서 앱을 직접 실행·시연 (HTTPS라 마이크 사용 가능) | 저장소 Settings → Secrets → Codespaces에 `OPENAI_API_KEY` 등록 → Code → Codespaces → Create. 터미널에서 `npm run demo` 실행 후 포트 3001 열기 |
+| **Codespaces** | 테스트용 웹 주소로 시연 (HTTPS라 마이크 사용 가능) | 저장소 Settings → Secrets → Codespaces에 `OPENAI_API_KEY` 등록 → Code → Codespaces → Create. 켜지면 앱이 자동으로 빌드·실행됨(로그 `/tmp/app.log`). Ports 탭에서 3001을 Public으로 바꾸면 로그인 없이 URL로 접속 가능 |
 | **Actions (CI)** | 푸시할 때마다 타입 검사·단위 테스트·빌드 자동 실행 | 없음. Actions 시크릿에 `OPENAI_API_KEY`를 넣으면 자연어 평가(`eval:nlu`)도 실행 |
 
 GitHub Pages는 정적 파일만 제공하므로 이 앱(서버 + 비밀 키 필요)은 Pages로는 실행할 수 없습니다.
