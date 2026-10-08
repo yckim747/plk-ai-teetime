@@ -123,13 +123,17 @@ export function App() {
     }
   }
 
+  /** 버튼으로 하는 검색 (조건 선택·더 보기·대안·다른 시간 등). AI는 쓰지 않지만 음성 답변은 똑같이 나온다. */
   async function search(next: SearchCriteria, note: string) {
+    // 버튼을 누른 순간에 오디오를 깨워 둬야 휴대폰에서 응답 후 소리가 난다.
+    unlockAudio();
+    stopSpeaking();
     setSheet(null);
     setDevOpen(false);
     push({ role: "user", text: note });
     setBusy(true);
     try {
-      apply(await api.search(next), false);
+      apply(await api.search(next), true);
     } catch (e) {
       pushError((e as Error).message);
     } finally {
