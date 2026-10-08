@@ -6,7 +6,7 @@
   "features": { "ghcr.io/devcontainers/features/sshd:1": {} },
   "postCreateCommand": "npm ci",
   // 켜질 때마다 최신 코드를 받아 빌드하고 3001 포트로 띄운다. 로그: /tmp/app.log
-  "postStartCommand": "bash scripts/restart-app.sh",
+  "postStartCommand": "nohup bash -c 'bash scripts/restart-app.sh > /tmp/restart.log 2>&1 &'",
   "forwardPorts": [3001],
   "portsAttributes": {
     "3001": { "label": "PLK AI 티타임", "onAutoForward": "openBrowser" },
