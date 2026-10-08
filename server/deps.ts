@@ -11,11 +11,17 @@ export function createDeps(csvPath: string): AppDeps {
   const apiKey = process.env.OPENAI_API_KEY?.trim();
   const client = apiKey ? new OpenAI({ apiKey, timeout: 30_000, maxRetries: 1 }) : undefined;
   const env = process.env;
+  const models = {
+    parse: env.OPENAI_MODEL || "gpt-4.1-mini",
+    stt: env.OPENAI_STT_MODEL || "gpt-4o-transcribe",
+    tts: env.OPENAI_TTS_MODEL || "gpt-4o-mini-tts",
+  };
   return {
+    models: client ? models : undefined,
     source: new CsvSource(csvPath),
-    parser: client && new OpenAIQueryParser(client, env.OPENAI_MODEL || "gpt-4.1-mini"),
-    transcriber: client && new OpenAITranscriber(client, env.OPENAI_STT_MODEL || "gpt-4o-transcribe"),
-    speaker: client && new OpenAISpeaker(client, env.OPENAI_TTS_MODEL || "gpt-4o-mini-tts", env.OPENAI_TTS_VOICE || "nova"),
+    parser: client && new OpenAIQueryParser(client, models.parse),
+    transcriber: client && new OpenAITranscriber(client, models.stt),
+    speaker: client && new OpenAISpeaker(client, models.tts, env.OPENAI_TTS_VOICE || "nova"),
     today: () => todaySeoul(),
   };
 }

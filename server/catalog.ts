@@ -1,4 +1,4 @@
-import type { CatalogInfo, SearchCriteria } from "../shared/types";
+import type { CatalogInfo, ModelInfo, SearchCriteria } from "../shared/types";
 import { formatDate } from "./dates";
 import type { CatalogData } from "./source/TeeTimeSource";
 
@@ -69,14 +69,15 @@ export function noticesFor(n: NormalizedCriteria, catalog: CatalogData): string[
   return notices;
 }
 
-export function toCatalogInfo(c: CatalogData, aiEnabled: boolean, today: string): CatalogInfo {
+export function toCatalogInfo(c: CatalogData, models: ModelInfo | null, today: string): CatalogInfo {
   return {
     regions: [...c.regions].map(([name, clubs]) => ({ name, clubs })),
     dateFrom: c.dateFrom,
     dateTo: c.dateTo,
     totalRows: c.totalRows,
     updatedAt: c.updatedAt.toISOString(),
-    aiEnabled,
+    aiEnabled: !!models,
     today,
+    models,
   };
 }

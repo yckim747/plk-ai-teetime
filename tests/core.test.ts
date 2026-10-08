@@ -9,6 +9,7 @@ import { buildSystemPrompt } from "../server/nlu/parseQuery";
 import { buildSpeech, speakDate, speakFee, speakTime } from "../server/reply";
 import { matches } from "../server/search/filter";
 import { pickTop, rankTeeTimes, sortForList } from "../server/search/recommend";
+import { featuredSections, upcomingWeekend } from "../server/search/featured";
 import { runSearch } from "../server/search/service";
 import { MemorySource, normalizeFee, normalizeTime, parseTeeTimeCsv } from "../server/source/CsvSource";
 
@@ -144,6 +145,36 @@ describe("검색 서비스·대안", () => {
     assert.equal(r.total, 4);
     assert.equal(r.clubCount, 3);
     assert.equal(r.alternatives.length, 0);
+  });
+});
+
+describe("첫 화면 추천 섹션", () => {
+  it("다가오는 주말 날짜", () => {
+    assert.deepEqual(upcomingWeekend("2026-10-08"), ["2026-10-10", "2026-10-11"]);
+    assert.deepEqual(upcomingWeekend("2026-10-10"), ["2026-10-10", "2026-10-11"]);
+    assert.deepEqual(upcomingWeekend("2026-10-11"), ["2026-10-11"]);
+  });
+  it("주말 오전 추천과 가성비 섹션을 실제 데이터로 만든다", async () => {
+    const source = new MemorySource(ROWS);
+    const [weekend, value] = await featuredSections(source, await source.catalog(), "2026-10-08");
+    assert.equal(weekend.id, "weekend");
+    assert.ok(weekend.items.every((r) => ["2026-10-10", "2026-10-11"].includes(r.teeTime.date) && r.teeTime.time <= "10:00"));
+    assert.deepEqual(weekend.items.slice(0, 2).map((r) => r.teeTime.club).sort(), ["A컨트리클럽", "B골프클럽"]);
+    assert.equal(value.id, "value");
+    assert.ok(value.items.every((r) => r.teeTime.fee != null), "가성비에는 그린피 미정 제외");
+    assert.equal(value.items[0].teeTime.fee, 120000);
+    const clubs = value.items.map((r) => r.teeTime.club);
+    assert.equal(new Set(clubs.slice(0, 4)).size, 4, "앞쪽은 골프장 중복 없이");
+  });
+  it("/api/featured", async () => {
+    const app = createApp({ source: new MemorySource(ROWS), today: () => "2026-10-08" });
+    const server = app.listen(0);
+    try {
+      const body = await (await fetch(`http://127.0.0.1:${(server.address() as AddressInfo).port}/api/featured`)).json();
+      assert.deepEqual(body.map((s: { id: string }) => s.id), ["weekend", "value"]);
+    } finally {
+      server.close();
+    }
   });
 });
 

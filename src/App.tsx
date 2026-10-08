@@ -1,17 +1,29 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { formatDate } from "../shared/format";
-import type { CatalogInfo, QueryResponse, SearchCriteria, SearchResult } from "../shared/types";
+import type { CatalogInfo, FeaturedSection, QueryResponse, Recommendation, SearchCriteria, SearchResult, TeeTime } from "../shared/types";
 import { api } from "./api";
-import { Alternatives } from "./components/Alternatives";
-import { Chat, type ChatMessage } from "./components/Chat";
-import { CriteriaBar } from "./components/CriteriaBar";
-import { ManualFilter } from "./components/ManualFilter";
-import { RecommendCards } from "./components/RecommendCards";
-import { ResultSummary } from "./components/ResultSummary";
-import { TeeTimeList } from "./components/TeeTimeList";
-import { speak, stopSpeaking, unlockAudio, useSpeaking } from "./speech";
+import { AllResultsSheet } from "./components/AllResultsSheet";
+import { AssistantMessage, type AssistantMsg } from "./components/AssistantMessage";
+import { Composer } from "./components/Composer";
+import { DevInfo } from "./components/DevInfo";
+import { Header } from "./components/Header";
+import { Home } from "./components/Home";
+import { Sheet } from "./components/Sheet";
+import { TeeTimeDetail } from "./components/TeeTimeDetail";
+import { MicIcon } from "./icons";
+import { speak, stopSpeaking, unlockAudio } from "./speech";
+
+interface UserMsg {
+  id: number;
+  role: "user";
+  text: string;
+  voice?: boolean;
+}
+type Msg = UserMsg | AssistantMsg;
+type SheetState = { kind: "detail"; rec: Recommendation } | { kind: "all"; result: SearchResult } | null;
 
 const VOICE_REPLY_KEY = "plk.voiceReply";
+let nextId = 1;
 
 function loadVoiceReply(): boolean {
   try {
@@ -24,38 +36,41 @@ function loadVoiceReply(): boolean {
 const isEmptyCriteria = (c: SearchCriteria) =>
   !c.dates.length && !c.regions.length && !c.clubs.length && !c.timeFrom && !c.timeTo && !c.preferredTime && !c.maxFee && !c.minFee;
 
-/** 결과 영역으로 스크롤 (휴대폰에서는 채팅 아래에 있어 안 보이기 쉬움) */
-function scrollToResults() {
-  requestAnimationFrame(() => document.getElementById("results")?.scrollIntoView({ behavior: "smooth", block: "start" }));
+/** "07:30" ± 분 */
+function shiftTime(t: string, minutes: number): string {
+  const m = Math.max(5 * 60, Math.min(20 * 60, Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5)) + minutes));
+  return `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
 }
 
 export function App() {
   const [catalog, setCatalog] = useState<CatalogInfo | null>(null);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [featured, setFeatured] = useState<FeaturedSection[] | null>(null);
+  const [messages, setMessages] = useState<Msg[]>([]);
   const [criteria, setCriteria] = useState<SearchCriteria | null>(null);
-  const [result, setResult] = useState<SearchResult | null>(null);
-  const [resultSeq, setResultSeq] = useState(0);
   const [busy, setBusy] = useState(false);
-  const [showFilter, setShowFilter] = useState(false);
-  const [dataUpdatedAt, setDataUpdatedAt] = useState<string | null>(null);
   const [voiceReply, setVoiceReply] = useState(loadVoiceReply);
-  const speaking = useSpeaking();
+  const [sheet, setSheet] = useState<SheetState>(null);
   const aiEnabled = catalog?.aiEnabled ?? false;
 
-  useEffect(() => {
-    api
-      .catalog()
-      .then((c) => {
-        setCatalog(c);
-        setDataUpdatedAt(c.updatedAt);
-        if (!c.aiEnabled) setShowFilter(true);
-      })
-      .catch((e: Error) => push({ role: "assistant", text: `데이터를 불러오지 못했습니다: ${e.message}`, error: true }));
+  const push = useCallback((m: Omit<UserMsg, "id"> | Omit<AssistantMsg, "id">) => {
+    setMessages((prev) => [...prev.slice(-39), { ...m, id: nextId++ } as Msg]);
   }, []);
+  const pushError = useCallback((text: string) => push({ role: "assistant", text, error: true }), [push]);
 
-  function push(m: ChatMessage) {
-    setMessages((prev) => [...prev.slice(-29), m]);
-  }
+  useEffect(() => {
+    api.catalog().then(setCatalog, (e: Error) => pushError(`데이터를 불러오지 못했습니다: ${e.message}`));
+    api.featured().then(setFeatured, () => setFeatured([]));
+  }, [pushError]);
+
+  // 새 답변이 오면 답변 시작 위치로, 내가 보낸 말·로딩은 맨 아래로 스크롤
+  useEffect(() => {
+    const last = messages[messages.length - 1];
+    if (!last) return;
+    requestAnimationFrame(() => {
+      if (last.role === "assistant") document.getElementById(`m-${last.id}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+      else window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "smooth" });
+    });
+  }, [messages]);
 
   function toggleVoiceReply() {
     const next = !voiceReply;
@@ -70,33 +85,14 @@ export function App() {
   }
 
   function playSpeech(text: string) {
-    speak(text).catch((e: Error) => push({ role: "assistant", text: e.message, error: true }));
+    speak(text).catch((e: Error) => pushError(e.message));
   }
 
-  function apply(res: QueryResponse, opts: { message: boolean; speak: boolean }) {
-    // "처음부터 다시" 등으로 조건이 모두 비면 결과도 비운다.
-    const cleared = !res.result && isEmptyCriteria(res.criteria);
-    setCriteria(cleared ? null : res.criteria);
-    setDataUpdatedAt(res.dataUpdatedAt);
-    if (res.result) {
-      setResult(res.result);
-      setResultSeq((n) => n + 1);
-      scrollToResults();
-    } else if (cleared) {
-      setResult(null);
-    }
-    if (opts.message) {
-      push({
-        role: "assistant",
-        text: res.reply,
-        speech: res.speech,
-        notices: res.notices,
-        suggestions: res.clarification?.suggestions,
-        resultTotal: res.result?.total,
-        hasAlternatives: !!res.result?.alternatives.length,
-      });
-    }
-    if (opts.speak && voiceReply && aiEnabled) playSpeech(res.speech);
+  function apply(res: QueryResponse, withSpeech: boolean) {
+    // "처음부터 다시" 등으로 조건이 모두 비면 이어지는 조건도 비운다.
+    setCriteria(!res.result && isEmptyCriteria(res.criteria) ? null : res.criteria);
+    push({ role: "assistant", text: res.reply, speech: res.speech, notices: res.notices, suggestions: res.clarification?.suggestions, result: res.result });
+    if (withSpeech && voiceReply && aiEnabled) playSpeech(res.speech);
   }
 
   async function ask(text: string, viaVoice = false) {
@@ -105,127 +101,105 @@ export function App() {
     push({ role: "user", text, voice: viaVoice });
     setBusy(true);
     try {
-      apply(await api.query(text, criteria), { message: true, speak: true });
+      apply(await api.query(text, criteria), true);
     } catch (e) {
-      push({ role: "assistant", text: (e as Error).message, error: true });
+      pushError((e as Error).message);
     } finally {
       setBusy(false);
     }
   }
 
-  async function search(next: SearchCriteria, note?: string) {
-    if (note) push({ role: "user", text: note });
+  async function search(next: SearchCriteria, note: string) {
+    setSheet(null);
+    push({ role: "user", text: note });
     setBusy(true);
     try {
-      apply(await api.search(next), { message: !!note, speak: false });
+      apply(await api.search(next), false);
     } catch (e) {
-      push({ role: "assistant", text: (e as Error).message, error: true });
+      pushError((e as Error).message);
     } finally {
       setBusy(false);
     }
   }
 
-  function reset() {
+  function newChat() {
     stopSpeaking();
+    setSheet(null);
+    setMessages([]);
     setCriteria(null);
-    setResult(null);
-    push({ role: "assistant", text: "검색 조건을 초기화했어요. 원하시는 날짜와 지역을 새로 말씀해 주세요." });
+    window.scrollTo({ top: 0 });
   }
+
+  const moreAtClub = (t: TeeTime) =>
+    search({ dates: [t.date], regions: [], clubs: [t.club], sort: "time" }, `${t.club} ${formatDate(t.date)} 다른 시간 보기`);
+  const similar = (t: TeeTime) =>
+    search(
+      { dates: [t.date], regions: [t.region], clubs: [], timeFrom: shiftTime(t.time, -60), timeTo: shiftTime(t.time, 60), preferredTime: t.time, sort: "recommend" },
+      `${formatDate(t.date)} ${t.region} ${t.time} 전후 비슷한 티타임`,
+    );
+  const select = (rec: Recommendation) => setSheet({ kind: "detail", rec });
 
   return (
     <div className="app">
-      <header className="topbar">
-        <div className="brand">
-          <img className="logo" src="/logo-horizontal.png" alt="Pacific Links Korea" width={512} height={81} />
-          <span className="brand-divider" aria-hidden />
-          <div>
-            <h1>AI 티타임 컨시어지</h1>
-            <p>말하거나 입력하면 실시간 잔여 티타임에서 찾아 추천해 드려요</p>
-          </div>
-        </div>
-        {catalog && (
-          <div className="status">
-            {aiEnabled && (
-              <button className={`toggle${voiceReply ? " on" : ""}`} onClick={toggleVoiceReply} aria-pressed={voiceReply}>
-                {voiceReply ? "🔊 음성 답변 켜짐" : "🔇 음성 답변 꺼짐"}
-              </button>
-            )}
-            {speaking && (
-              <button className="ghost small" onClick={stopSpeaking}>
-                ■ 읽기 멈춤
-              </button>
-            )}
-            <span className={`pill ${aiEnabled ? "ok" : "warn"}`}>{aiEnabled ? "AI 연결됨" : "AI 미설정 · 수동 검색"}</span>
-            <span className="muted">
-              {catalog.totalRows.toLocaleString("ko-KR")}건 · {formatDate(catalog.dateFrom)}~{formatDate(catalog.dateTo)}
-              {dataUpdatedAt && ` · 갱신 ${new Date(dataUpdatedAt).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}`}
-            </span>
-          </div>
-        )}
-      </header>
+      <Header voiceReply={voiceReply} showVoiceToggle={aiEnabled} canReset={messages.length > 0} onToggleVoice={toggleVoiceReply} onNewChat={newChat} />
 
-      <main className="layout">
-        <section className="panel chat-panel">
-          <Chat
-            messages={messages}
-            busy={busy}
-            aiEnabled={aiEnabled}
-            onAsk={ask}
-            onError={(text) => push({ role: "assistant", text, error: true })}
-            onSpeak={playSpeech}
-            onShowResults={scrollToResults}
-          />
-        </section>
-
-        <section className="results" id="results">
-          <div className="results-head">
-            <CriteriaBar criteria={criteria} onChange={(c) => search(c)} disabled={busy} />
-            <div className="head-actions">
-              {criteria && (
-                <button className="ghost" onClick={reset} disabled={busy}>
-                  ↺ 조건 초기화
-                </button>
-              )}
-              <button className="ghost" onClick={() => setShowFilter((v) => !v)}>
-                {showFilter ? "필터 닫기" : "직접 고르기"}
-              </button>
-            </div>
-          </div>
-          {showFilter && catalog && <ManualFilter catalog={catalog} initial={criteria} onSearch={(c) => search(c, "필터로 검색")} disabled={busy} />}
-
-          {result ? (
-            <>
-              <ResultSummary key={resultSeq} result={result} />
-              <RecommendCards items={result.recommendations} total={result.total} />
-              {result.alternatives.length > 0 && <Alternatives items={result.alternatives} onPick={(a) => search(a.criteria, `대안 선택: ${a.label}`)} />}
-              {result.total > 0 && (
-                <TeeTimeList result={result} onSort={(sort) => criteria && search({ ...criteria, sort })} disabled={busy} />
-              )}
-            </>
+      <main className="main">
+        <div className="column">
+          {messages.length === 0 ? (
+            <Home featured={featured} aiEnabled={aiEnabled} onSelect={select} onMore={search} onAsk={ask} />
           ) : (
-            <Empty catalog={catalog} />
+            <div className="thread">
+              {messages.map((m, i) =>
+                m.role === "user" ? (
+                  <div key={m.id} className="umsg">
+                    <p>
+                      {m.voice && <MicIcon className="voice-mark" width={14} height={14} aria-label="음성" />}
+                      {m.text}
+                    </p>
+                  </div>
+                ) : (
+                  <AssistantMessage
+                    key={m.id}
+                    msg={m}
+                    isLast={i === messages.length - 1}
+                    busy={busy}
+                    canSpeak={aiEnabled}
+                    onSpeak={playSpeech}
+                    onSelect={select}
+                    onShowAll={(result) => setSheet({ kind: "all", result })}
+                    onSearch={search}
+                    onAsk={ask}
+                    onNewChat={newChat}
+                  />
+                ),
+              )}
+              {busy && (
+                <div className="typing" role="status">
+                  <span className="dots" aria-hidden>
+                    <i />
+                    <i />
+                    <i />
+                  </span>
+                  티타임을 찾고 있어요
+                </div>
+              )}
+            </div>
           )}
-        </section>
+          <DevInfo catalog={catalog} busy={busy} onSearch={search} />
+        </div>
       </main>
-    </div>
-  );
-}
 
-function Empty({ catalog }: { catalog: CatalogInfo | null }) {
-  return (
-    <div className="panel empty">
-      <h2>이렇게 물어보세요</h2>
-      <ul>
-        <li>🎤 버튼을 누르고 “이번 주 토요일 오전 한강이남 25만원 이하”라고 말해 보세요.</li>
-        <li>“10월 15일 오후 2시쯤 써닝포인트”</li>
-        <li>“다음 주말 제주도 새벽, 제일 싼 곳”</li>
-        <li>결과가 나온 뒤에는 “좀 더 늦게”, “한강이북도 포함해줘”처럼 이어서 물어볼 수 있어요.</li>
-        <li>“처음부터 다시”라고 하거나 ↺ 조건 초기화를 누르면 새로 찾을 수 있어요.</li>
-      </ul>
-      {catalog && (
-        <p className="muted">
-          조회 가능: {catalog.regions.map((r) => `${r.name} ${r.clubs.length}곳`).join(" · ")}
-        </p>
+      <Composer disabled={!aiEnabled} busy={busy} onSend={ask} onError={pushError} />
+
+      {sheet?.kind === "detail" && (
+        <Sheet title="티타임 상세" onClose={() => setSheet(null)}>
+          <TeeTimeDetail rec={sheet.rec} onMoreAtClub={moreAtClub} onSimilar={similar} onClose={() => setSheet(null)} />
+        </Sheet>
+      )}
+      {sheet?.kind === "all" && (
+        <Sheet title="전체 티타임" onClose={() => setSheet(null)}>
+          <AllResultsSheet result={sheet.result} onSelect={select} />
+        </Sheet>
       )}
     </div>
   );

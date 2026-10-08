@@ -75,6 +75,21 @@ export interface QueryResponse {
   dataUpdatedAt: string;
 }
 
+export interface FeaturedSection {
+  id: string;
+  title: string;
+  subtitle: string;
+  /** "더 보기"를 누르면 이 조건으로 검색 */
+  criteria: SearchCriteria;
+  items: Recommendation[];
+}
+
+export interface ModelInfo {
+  parse: string;
+  stt: string;
+  tts: string;
+}
+
 export interface CatalogRegion {
   name: string;
   clubs: string[];
@@ -88,4 +103,6 @@ export interface CatalogInfo {
   updatedAt: string;
   aiEnabled: boolean;
   today: string;
+  /** 테스트 정보 표시용 */
+  models: ModelInfo | null;
 }

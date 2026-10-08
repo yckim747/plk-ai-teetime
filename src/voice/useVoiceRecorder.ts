@@ -1,26 +1,26 @@
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "../api";
 import { getAudioContext, stopSpeaking } from "../speech";
-import { createEndpointDetector, rms } from "../voice/endpoint";
-import { acquireMic, pauseMic } from "../voice/mic";
+import { createEndpointDetector, rms } from "./endpoint";
+import { acquireMic, pauseMic } from "./mic";
 
 const MAX_SECONDS = 30;
 const TICK_MS = 50;
 const MIME_TYPES = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg;codecs=opus"];
-const BAR_SHAPE = [0.45, 0.75, 1, 0.75, 0.45];
 
-interface Props {
-  disabled: boolean;
+export type RecorderState = "idle" | "recording" | "transcribing";
+
+interface Options {
   onText: (text: string) => void;
   onError: (message: string) => void;
 }
 
 /**
- * 한 번 누르고 말하면, 말이 끝날 때(1.4초 침묵) 자동으로 녹음을 끝내고 음성 인식 → 문의까지 이어간다.
- * 시끄러워서 자동 종료가 안 되면 다시 눌러 바로 끝낼 수 있다. 6초 동안 말이 없으면 취소한다.
+ * 음성 문의 녹음. 한 번 시작하면 말이 끝날 때(1.4초 침묵) 자동으로 끝내고 음성 인식 → onText까지 이어간다.
+ * finish()로 바로 끝낼 수 있고, cancel()은 보내지 않고 버린다. 6초 동안 말이 없으면 자동 취소.
  */
-export function VoiceButton({ disabled, onText, onError }: Props) {
-  const [state, setState] = useState<"idle" | "recording" | "transcribing">("idle");
+export function useVoiceRecorder({ onText, onError }: Options) {
+  const [state, setState] = useState<RecorderState>("idle");
   const [seconds, setSeconds] = useState(0);
   const [level, setLevel] = useState(0);
   const [heard, setHeard] = useState(false);
@@ -32,12 +32,13 @@ export function VoiceButton({ disabled, onText, onError }: Props) {
   useEffect(
     () => () => {
       discard.current = true;
-      stop();
+      finish();
     },
     [],
   );
 
-  function stop() {
+  /** 녹음을 끝내고 음성 인식으로 보낸다 */
+  function finish() {
     window.clearInterval(timer.current);
     release.current();
     release.current = () => {};
@@ -46,18 +47,19 @@ export function VoiceButton({ disabled, onText, onError }: Props) {
   }
 
   /** 서버로 보내지 않고 녹음을 버린다 */
-  function cancel(message: string) {
+  function cancel(message?: string) {
     discard.current = true;
-    stop();
-    onError(message);
+    finish();
+    if (message) onError(message);
   }
 
   async function start() {
+    if (state !== "idle") return;
     // 녹음 중에 음성 답변이 마이크로 들어가지 않게 멈춘다. 이 터치로 오디오도 깨워 둔다.
     stopSpeaking();
     const ctx = getAudioContext();
     if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
-      onError("이 브라우저는 음성 녹음을 지원하지 않습니다. (localhost 또는 HTTPS에서 최신 브라우저를 이용해 주세요)");
+      onError("이 브라우저는 음성 녹음을 지원하지 않습니다. 최신 크롬·사파리에서 이용해 주세요.");
       return;
     }
     let stream: MediaStream;
@@ -98,7 +100,7 @@ export function VoiceButton({ disabled, onText, onError }: Props) {
       }
     };
 
-    // 음량 측정: 오디오를 쓸 수 없는 환경이면 자동 종료 없이 기존처럼 다시 눌러 끝낸다.
+    // 음량 측정: 오디오를 쓸 수 없는 환경이면 자동 종료 없이 finish()로 끝낸다.
     let analyser: AnalyserNode | null = null;
     if (ctx) {
       const source = ctx.createMediaStreamSource(stream);
@@ -120,52 +122,17 @@ export function VoiceButton({ disabled, onText, onError }: Props) {
       const now = performance.now();
       const s = Math.floor((now - startedAt) / 1000);
       setSeconds(s);
-      if (s >= MAX_SECONDS) return stop();
+      if (s >= MAX_SECONDS) return finish();
       if (!analyser || ctx?.state !== "running") return;
       analyser.getFloatTimeDomainData(samples);
       const v = rms(samples);
       setLevel(Math.min(1, v * 8));
       const st = detector.push(v, now);
       if (st === "speaking") setHeard(true);
-      else if (st === "end") stop();
+      else if (st === "end") finish();
       else if (st === "no-speech") cancel("말씀이 들리지 않았어요. 마이크를 다시 누르고 말씀해 주세요.");
     }, TICK_MS);
   }
 
-  const label = state === "recording" ? "듣는 중 · 누르면 바로 검색" : state === "transcribing" ? "알아듣는 중…" : "눌러서 말하기";
-
-  return (
-    <>
-      <button
-        type="button"
-        className={`mic ${state}`}
-        style={{ "--level": level } as CSSProperties}
-        onClick={() => (state === "recording" ? stop() : start())}
-        disabled={state === "transcribing" || (disabled && state !== "recording")}
-        aria-label={label}
-        title={label}
-      >
-        {state === "recording" ? <span className="rec-dot" /> : state === "transcribing" ? "…" : "🎤"}
-      </button>
-      {state !== "idle" && (
-        <div className="voice-status" role="status">
-          {state === "recording" ? (
-            <>
-              <span className="bars" aria-hidden>
-                {BAR_SHAPE.map((k, i) => (
-                  <i key={i} style={{ transform: `scaleY(${0.15 + Math.min(1, level * 2.2) * k})` }} />
-                ))}
-              </span>
-              <span>{heard ? "말씀이 끝나면 자동으로 찾아드려요" : "듣고 있어요 — 말씀해 주세요"}</span>
-              <span className="muted">
-                {seconds}s · 버튼을 누르면 바로 검색
-              </span>
-            </>
-          ) : (
-            <span>알아듣는 중…</span>
-          )}
-        </div>
-      )}
-    </>
-  );
+  return { state, seconds, level, heard, start, finish, cancel };
 }

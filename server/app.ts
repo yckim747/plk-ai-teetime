@@ -2,12 +2,13 @@ import express, { type NextFunction, type Request, type Response } from "express
 import multer from "multer";
 import OpenAI from "openai";
 import { z } from "zod";
-import { SearchCriteriaSchema, type Clarification, type QueryResponse, type SearchCriteria } from "../shared/types";
+import { SearchCriteriaSchema, type Clarification, type FeaturedSection, type ModelInfo, type QueryResponse, type SearchCriteria } from "../shared/types";
 import { normalizeCriteria, noticesFor, toCatalogInfo } from "./catalog";
 import type { QueryParser } from "./nlu/parseQuery";
 import type { Speaker } from "./nlu/speak";
 import type { Transcriber } from "./nlu/transcribe";
 import { buildReply, buildSpeech } from "./reply";
+import { featuredSections } from "./search/featured";
 import { runSearch } from "./search/service";
 import type { CatalogData, TeeTimeSource } from "./source/TeeTimeSource";
 
@@ -17,6 +18,8 @@ export interface AppDeps {
   parser?: QueryParser;
   transcriber?: Transcriber;
   speaker?: Speaker;
+  /** 테스트 정보에 표시할 사용 모델 (AI 미설정이면 없음) */
+  models?: ModelInfo;
   today: () => string;
 }
 
@@ -40,7 +43,7 @@ class HttpError extends Error {
 
 const DATE_SUGGESTIONS = ["이번 주말", "다음 주 토요일", "날짜 상관없이 제일 싼 곳"];
 
-export function createApp({ source, parser, transcriber, speaker, today }: AppDeps) {
+export function createApp({ source, parser, transcriber, speaker, models, today }: AppDeps) {
   const app = express();
   app.use(express.json({ limit: "100kb" }));
   const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_AUDIO_BYTES, files: 1 } });
@@ -67,7 +70,16 @@ export function createApp({ source, parser, transcriber, speaker, today }: AppDe
   });
 
   app.get("/api/catalog", async (_req, res) => {
-    res.json(toCatalogInfo(await source.catalog(), !!parser, today()));
+    res.json(toCatalogInfo(await source.catalog(), parser ? (models ?? null) : null, today()));
+  });
+
+  /** 첫 화면 추천 섹션 (데이터 갱신 시각·날짜가 같으면 캐시) */
+  let featuredCache: { key: string; sections: FeaturedSection[] } | undefined;
+  app.get("/api/featured", async (_req, res) => {
+    const catalog = await source.catalog();
+    const key = `${catalog.updatedAt.getTime()}|${today()}`;
+    if (featuredCache?.key !== key) featuredCache = { key, sections: await featuredSections(source, catalog, today()) };
+    res.json(featuredCache.sections);
   });
 
   /** 조건으로 직접 검색 (조건 칩 해제·대안 선택·수동 필터). AI를 호출하지 않는다. */
