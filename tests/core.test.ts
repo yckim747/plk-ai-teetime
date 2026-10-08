@@ -195,6 +195,8 @@ describe("음성 답변 문장", () => {
     assert.match(s, /^10월 12일 월요일 베어포트리조트CC에서 찾아봤어요. 티타임 1개가 있고/);
     assert.match(s, /추천은 베어포트리조트CC 오전 9시, 그린피 12만원이에요/);
     assert.match(s, /화면에서 확인해 주세요/);
+    const spoken = buildSpeech({ ...r, criteria: { ...r.criteria, clubs: [], regions: ["한강이남"] } });
+    assert.ok(spoken.includes("한강 이남"), "지역명은 띄어 읽기");
     assert.doesNotMatch(s, /[()·~]/);
   });
 });

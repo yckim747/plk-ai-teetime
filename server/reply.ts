@@ -23,6 +23,9 @@ export function buildReply(r: SearchResult): string {
 
 const speakClub = (club: string) => club.replace(/\(.*?\)/g, "").trim();
 
+/** 음성 합성이 또렷하게 읽도록 다듬는다: "한강이남" → "한강 이남" (붙여 쓰면 "한간이남"처럼 뭉개졌다) */
+export const forSpeech = (text: string) => text.replace(/한강이(남|북)/g, "한강 이$1");
+
 /** "2026-10-10" → "10월 10일 토요일" (숫자 표기가 한글 표기보다 음성 합성 발음이 정확했다) */
 export function speakDate(d: string): string {
   const [, m, day] = d.split("-").map(Number);
@@ -68,13 +71,15 @@ function speakCriteria(c: SearchCriteria): string {
 export function buildSpeech(r: SearchResult): string {
   const asked = `${speakCriteria(r.criteria)}에서 찾아봤어요.`;
   if (r.total === 0) {
-    return r.alternatives.length
-      ? `${asked} 조건에 맞는 티타임은 없고, 조금 바꾼 대안을 화면에 보여드릴게요.`
-      : `${asked} 조건에 맞는 티타임은 없어요. 날짜나 지역을 바꿔서 다시 말씀해 주세요.`;
+    return forSpeech(
+      r.alternatives.length
+        ? `${asked} 조건에 맞는 티타임은 없고, 조금 바꾼 대안을 화면에 보여드릴게요.`
+        : `${asked} 조건에 맞는 티타임은 없어요. 날짜나 지역을 바꿔서 다시 말씀해 주세요.`,
+    );
   }
   const t = r.recommendations[0].teeTime;
   // 여러 날짜를 물었으면 추천 날짜는 요일만 ("토요일 오전 8시")
   const day = r.criteria.dates.length === 1 ? "" : `${weekdayKo(t.date)}요일 `;
   const fee = t.fee == null ? "그린피는 문의가 필요해요" : `${speakFee(t.fee)}이에요`;
-  return `${asked} 티타임 ${r.total}개가 있고, 추천은 ${speakClub(t.club)} ${day}${speakTime(t.time)}, ${fee}. 나머지는 화면에서 확인해 주세요.`;
+  return forSpeech(`${asked} 티타임 ${r.total}개가 있고, 추천은 ${speakClub(t.club)} ${day}${speakTime(t.time)}, ${fee}. 나머지는 화면에서 확인해 주세요.`);
 }

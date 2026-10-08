@@ -9,7 +9,7 @@ import { normalizeCriteria, noticesFor, toCatalogInfo } from "./catalog";
 import type { QueryParser } from "./nlu/parseQuery";
 import { PCM_CONTENT_TYPE, type Speaker } from "./nlu/speak";
 import type { Transcriber } from "./nlu/transcribe";
-import { buildReply, buildSpeech } from "./reply";
+import { buildReply, buildSpeech, forSpeech } from "./reply";
 import { featuredSections } from "./search/featured";
 import { pickTop, rankTeeTimes } from "./search/recommend";
 import { runSearch } from "./search/service";
@@ -79,7 +79,7 @@ export function createApp({ source, parser, transcriber, speaker, models, today 
           const reply = `'${n.unmatchedClubs.join("', '")}'은(는) 지금 조회할 수 없어요. 가까운 ${near.join("·")} 지역 골프장은 이런 시간이 있어요.`;
           return {
             reply,
-            speech: reply,
+            speech: forSpeech(reply),
             criteria: n.criteria,
             result: { criteria: n.criteria, total: 0, clubCount: 0, items: [], recommendations: [], alternatives: [alt] },
             notices: noticesFor({ ...n, unmatchedClubs: [] }, catalog),
