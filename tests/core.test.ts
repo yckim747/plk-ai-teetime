@@ -6,6 +6,7 @@ import { createApp } from "../server/app";
 import { matchClub, normalizeCriteria } from "../server/catalog";
 import type { QueryParser } from "../server/nlu/parseQuery";
 import { buildSystemPrompt } from "../server/nlu/parseQuery";
+import { buildSpeech, speakDate, speakFee, speakTime } from "../server/reply";
 import { matches } from "../server/search/filter";
 import { pickTop, rankTeeTimes, sortForList } from "../server/search/recommend";
 import { runSearch } from "../server/search/service";
@@ -146,6 +147,27 @@ describe("검색 서비스·대안", () => {
   });
 });
 
+describe("음성 답변 문장", () => {
+  it("시간·금액을 읽기 좋은 말로 바꾼다", () => {
+    assert.equal(speakTime("08:13"), "오전 8시 13분");
+    assert.equal(speakTime("13:00"), "오후 1시");
+    assert.equal(speakTime("12:30"), "오후 12시 30분");
+    assert.equal(speakDate("2026-10-10"), "10월 10일 토요일");
+    assert.equal(speakFee(195000), "그린피 19만 5천원");
+    assert.equal(speakFee(190000), "그린피 19만원");
+    assert.equal(speakFee(null), "그린피는 별도 문의");
+  });
+  it("괄호·기호 없이 추천과 화면 안내를 말한다", async () => {
+    const source = new MemorySource(ROWS);
+    const r = await runSearch(source, c({ dates: ["2026-10-12"], clubs: ["베어포트리조트CC(구.웅포)"] }), await source.catalog());
+    const s = buildSpeech(r);
+    assert.match(s, /^10월 12일 월요일 베어포트리조트CC 조건으로 티타임 1개를 찾았어요/);
+    assert.match(s, /오전 9시, 그린피 12만원입니다/);
+    assert.match(s, /화면에서 확인해 주세요/);
+    assert.doesNotMatch(s, /[()·~]/);
+  });
+});
+
 describe("프롬프트", () => {
   it("오늘·달력·골프장 목록을 포함한다", async () => {
     const p = buildSystemPrompt(await new MemorySource(ROWS).catalog(), "2026-10-08");
@@ -157,7 +179,8 @@ describe("프롬프트", () => {
 
 describe("HTTP API", () => {
   async function withServer(parser: QueryParser | undefined, fn: (base: string) => Promise<void>) {
-    const app = createApp({ source: new MemorySource(ROWS), parser, today: () => "2026-10-08" });
+    const speaker = { speak: async (text: string) => Buffer.from(`mp3:${text}`) };
+    const app = createApp({ source: new MemorySource(ROWS), parser, speaker: parser && speaker, today: () => "2026-10-08" });
     const server = app.listen(0);
     try {
       await fn(`http://127.0.0.1:${(server.address() as AddressInfo).port}`);
@@ -175,6 +198,7 @@ describe("HTTP API", () => {
       assert.equal(body.result.total, 1);
       assert.equal(body.result.recommendations[0].teeTime.club, "B골프클럽");
       assert.match(body.reply, /B골프클럽/);
+      assert.match(body.speech, /B골프클럽/);
     });
   });
 
@@ -205,6 +229,19 @@ describe("HTTP API", () => {
       const d = await (await post(`${base}/api/query`, { message: "더 싸게", prevCriteria: c({ dates: ["2026-10-10"] }) })).json();
       assert.equal(d.criteria.sort, "price");
       assert.equal(d.result.items[0].fee, 150000);
+    });
+  });
+
+  it("/api/speak는 mp3를 돌려주고, AI 미설정이면 503", async () => {
+    const parser: QueryParser = { parse: async () => { throw new Error("unused"); } };
+    await withServer(parser, async (base) => {
+      const res = await post(`${base}/api/speak`, { text: "안녕하세요" });
+      assert.equal(res.headers.get("content-type"), "audio/mpeg");
+      assert.equal(Buffer.from(await res.arrayBuffer()).toString(), "mp3:안녕하세요");
+      assert.equal((await post(`${base}/api/speak`, { text: "" })).status, 400);
+    });
+    await withServer(undefined, async (base) => {
+      assert.equal((await post(`${base}/api/speak`, { text: "안녕" })).status, 503);
     });
   });
 

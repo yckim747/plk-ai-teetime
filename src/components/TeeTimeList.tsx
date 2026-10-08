@@ -20,9 +20,10 @@ export function TeeTimeList({ result, onSort, disabled }: Props) {
     else groups.set(t.club, [t]);
   }
   const multiDate = new Set(result.items.map((t) => t.date)).size > 1;
+  const recIds = new Set(result.recommendations.map((r) => r.teeTime.id));
 
   return (
-    <section className="block">
+    <section className="block" id="all-list">
       <div className="list-head">
         <h2>
           가능한 티타임 <span className="muted">{result.clubCount}개 골프장 · {result.total.toLocaleString("ko-KR")}건</span>
@@ -35,17 +36,18 @@ export function TeeTimeList({ result, onSort, disabled }: Props) {
           ))}
         </div>
       </div>
+      <p className="muted small">★ 표시는 위 추천 티타임입니다.</p>
       {result.total > result.items.length && <p className="muted small">상위 {result.items.length}건만 표시합니다. 조건을 좁혀 보세요.</p>}
       <div className="groups">
         {[...groups].map(([club, list]) => (
-          <ClubGroup key={club} club={club} list={list} multiDate={multiDate} />
+          <ClubGroup key={club} club={club} list={list} multiDate={multiDate} recIds={recIds} />
         ))}
       </div>
     </section>
   );
 }
 
-function ClubGroup({ club, list, multiDate }: { club: string; list: TeeTime[]; multiDate: boolean }) {
+function ClubGroup({ club, list, multiDate, recIds }: { club: string; list: TeeTime[]; multiDate: boolean; recIds: Set<string> }) {
   const [open, setOpen] = useState(false);
   const fees = list.map((t) => t.fee).filter((f): f is number => f != null);
   const shown = open ? list : list.slice(0, PREVIEW);
@@ -59,7 +61,8 @@ function ClubGroup({ club, list, multiDate }: { club: string; list: TeeTime[]; m
       </div>
       <div className="slots">
         {shown.map((t) => (
-          <span key={t.id} className="slot" title={`${formatDate(t.date)} ${t.time} ${t.course} ${formatFee(t.fee)}`}>
+          <span key={t.id} className={`slot${recIds.has(t.id) ? " rec" : ""}`} title={`${formatDate(t.date)} ${t.time} ${t.course} ${formatFee(t.fee)}`}>
+            {recIds.has(t.id) && <i aria-label="추천">★</i>}
             {multiDate && <em>{formatDate(t.date)}</em>}
             <b>{t.time}</b>
             <span>{t.course}</span>

@@ -9,7 +9,7 @@ interface Props {
 export function RecommendCards({ items, total }: Props) {
   if (!total) return null;
   return (
-    <section className="block">
+    <section className="block" id="recommend">
       <h2>
         추천 티타임 <span className="muted">가능 {total.toLocaleString("ko-KR")}건 중</span>
       </h2>
@@ -18,6 +18,11 @@ export function RecommendCards({ items, total }: Props) {
           <RecommendCard key={r.teeTime.id} rec={r} rank={i + 1} />
         ))}
       </div>
+      {total > items.length && (
+        <button className="link more-link" onClick={() => document.getElementById("all-list")?.scrollIntoView({ behavior: "smooth", block: "start" })}>
+          조건에 맞는 전체 {total.toLocaleString("ko-KR")}건은 아래 목록에서 확인하세요 ↓
+        </button>
+      )}
     </section>
   );
 }

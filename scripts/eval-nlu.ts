@@ -53,6 +53,7 @@ const CASES: Case[] = [
   { text: "가격은 상관없어", prev: base, expect: { dates: ["2026-10-10"], regions: ["한강이남"], maxFee: undefined } },
   { text: "다음 주 일요일 제주도 오후로 새로 찾아줘", prev: base, expect: { dates: ["2026-10-18"], regions: ["제주도"], timeFrom: "12:00", maxFee: undefined } },
   { text: "토요일 말고 일요일로", prev: base, expect: { dates: ["2026-10-11"], regions: ["한강이남"], maxFee: 250000 } },
+  { text: "처음부터 다시 할게", prev: base, expect: { dates: [], regions: [], clubs: [], timeTo: undefined, maxFee: undefined } },
 ];
 
 const norm = (v: unknown) => (Array.isArray(v) ? JSON.stringify([...v].sort()) : JSON.stringify(v));

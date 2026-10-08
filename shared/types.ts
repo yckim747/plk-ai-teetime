@@ -66,6 +66,8 @@ export interface SearchResult {
 
 export interface QueryResponse {
   reply: string;
+  /** 음성 답변용 문장 (괄호·기호 없이 읽기 좋은 형태) */
+  speech: string;
   criteria: SearchCriteria;
   clarification?: Clarification;
   result?: SearchResult;

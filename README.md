@@ -10,8 +10,11 @@
           3) 데이터 검색 (필수 조건 필터)
           4) 추천 점수 → 서로 다른 골프장 Top 3 + 추천 이유
           5) 0~2건이면 대안 탐색 (날짜 ±1일, 시간대 확장, 인접 지역, 최저 그린피까지 예산)
-          6) 실제 결과로 응답 문장 생성
+          6) 실제 결과로 응답 문장 생성 (화면용 + 음성용)
+🔊 음성용 문장 ──▶ /api/speak (OpenAI 음성 합성) ──▶ 답변을 읽어 줌
 ```
+
+화면 기능: 음성 문의·음성 답변(켜고 끄기, 🔊 다시 듣기), 결과 요약 배너와 바로가기, 전체 목록의 ★ 추천 표시, ↺ 조건 초기화("처음부터 다시"라고 말해도 됨), 조건 칩 개별 해제, 직접 고르기 필터.
 
 **AI는 문장을 검색 조건으로 바꾸는 일만 합니다.** 검색·추천·응답 문구는 서버가 실제 데이터 행으로 만들기 때문에, 없는 티타임을 지어내지 않습니다.
 
@@ -45,7 +48,7 @@ GitHub Pages는 정적 파일만 제공하므로 이 앱(서버 + 비밀 키 필
 | `npm run dev` | API(3001) + 웹(5173) 개발 서버 |
 | `npm run demo` | 웹 빌드 후 3001 포트 하나로 실행 |
 | `npm test` | 단위·HTTP 통합 테스트 (OpenAI 호출 없음) |
-| `npm run eval:nlu [모델]` | 실제 OpenAI로 문장 23개를 조건으로 변환해 정확도·지연 측정 (기준일 2026-10-08 고정) |
+| `npm run eval:nlu [모델]` | 실제 OpenAI로 문장 24개를 조건으로 변환해 정확도·지연 측정 (기준일 2026-10-08 고정) |
 | `npm run typecheck` | 타입 검사 |
 
 ## 환경변수 (.env)
@@ -55,6 +58,7 @@ GitHub Pages는 정적 파일만 제공하므로 이 앱(서버 + 비밀 키 필
 | `OPENAI_API_KEY` | – | 서버에서만 사용, 브라우저로 전달되지 않음 |
 | `OPENAI_MODEL` | `gpt-4.1-mini` | 문장 → 조건 변환 모델 |
 | `OPENAI_STT_MODEL` | `gpt-4o-transcribe` | 음성 인식 모델 |
+| `OPENAI_TTS_MODEL` / `OPENAI_TTS_VOICE` | `gpt-4o-mini-tts` / `nova` | 음성 답변 모델·목소리 |
 | `TEETIME_CSV` | `data/teetimes.csv` | 티타임 데이터. **파일이 바뀌면 다음 요청 때 자동으로 다시 읽음** |
 | `PORT` / `HOST` | `3001` / `127.0.0.1` | 서버 주소 |
 | `TODAY` | 서울 기준 오늘 | "이번 주말" 등 상대 날짜의 기준일 고정 (시연용) |
@@ -85,9 +89,10 @@ server/source/             TeeTimeSource 인터페이스, CsvSource(파일 변�
 server/catalog.ts          골프장명 매칭·조건 정규화
 server/nlu/parseQuery.ts   OpenAI Responses API 구조화 출력, 프롬프트(오늘·달력·골프장 목록 포함)
 server/nlu/transcribe.ts   OpenAI 음성 인식(골프장명 힌트)
+server/nlu/speak.ts        OpenAI 음성 합성(답변 읽기)
 server/search/             filter · recommend · relax(대안) · service
 server/reply.ts            결과 기반 응답 문장
-server/app.ts              API (/api/catalog, /api/query, /api/search, /api/transcribe)
+server/app.ts              API (/api/catalog, /api/query, /api/search, /api/transcribe, /api/speak)
 src/                       React 화면 (채팅·음성·조건 칩·추천 카드·대안·전체 목록·수동 필터)
 tests/                     node:test 테스트
 scripts/eval-nlu.ts        자연어 평가셋

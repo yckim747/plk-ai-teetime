@@ -5,8 +5,9 @@ import { z } from "zod";
 import { SearchCriteriaSchema, type Clarification, type QueryResponse, type SearchCriteria } from "../shared/types";
 import { normalizeCriteria, noticesFor, toCatalogInfo } from "./catalog";
 import type { QueryParser } from "./nlu/parseQuery";
+import type { Speaker } from "./nlu/speak";
 import type { Transcriber } from "./nlu/transcribe";
-import { buildReply } from "./reply";
+import { buildReply, buildSpeech } from "./reply";
 import { runSearch } from "./search/service";
 import type { CatalogData, TeeTimeSource } from "./source/TeeTimeSource";
 
@@ -15,6 +16,7 @@ export interface AppDeps {
   /** 없으면 AI 기능(자연어·음성) 비활성, 수동 검색만 동작 */
   parser?: QueryParser;
   transcriber?: Transcriber;
+  speaker?: Speaker;
   today: () => string;
 }
 
@@ -25,6 +27,7 @@ const QueryBody = z.object({
   prevCriteria: SearchCriteriaSchema.optional(),
 });
 const SearchBody = z.object({ criteria: SearchCriteriaSchema });
+const SpeakBody = z.object({ text: z.string().trim().min(1).max(600) });
 
 class HttpError extends Error {
   constructor(
@@ -37,7 +40,7 @@ class HttpError extends Error {
 
 const DATE_SUGGESTIONS = ["이번 주말", "다음 주 토요일", "날짜 상관없이 제일 싼 곳"];
 
-export function createApp({ source, parser, transcriber, today }: AppDeps) {
+export function createApp({ source, parser, transcriber, speaker, today }: AppDeps) {
   const app = express();
   app.use(express.json({ limit: "100kb" }));
   const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_AUDIO_BYTES, files: 1 } });
@@ -53,10 +56,10 @@ export function createApp({ source, parser, transcriber, today }: AppDeps) {
         question: "말씀하신 골프장은 지금 조회할 수 없어요. 다른 지역으로 찾아드릴까요?",
         suggestions: [...catalog.regions.keys()].slice(0, 4).map((r) => `${when}${r}에서 찾아줘`),
       };
-      return { reply: clarification.question, criteria: n.criteria, clarification, notices, dataUpdatedAt };
+      return { reply: clarification.question, speech: clarification.question, criteria: n.criteria, clarification, notices, dataUpdatedAt };
     }
     const result = await runSearch(source, n.criteria, catalog);
-    return { reply: buildReply(result), criteria: n.criteria, result, notices, dataUpdatedAt };
+    return { reply: buildReply(result), speech: buildSpeech(result), criteria: n.criteria, result, notices, dataUpdatedAt };
   }
 
   app.get("/api/health", (_req, res) => {
@@ -89,6 +92,7 @@ export function createApp({ source, parser, transcriber, today }: AppDeps) {
       const n = normalizeCriteria(c, catalog);
       res.json({
         reply: clarification.question,
+        speech: clarification.question,
         criteria: n.criteria,
         clarification,
         notices: [],
@@ -106,6 +110,14 @@ export function createApp({ source, parser, transcriber, today }: AppDeps) {
     const catalog = await source.catalog();
     const text = await transcriber.transcribe(req.file.buffer, req.file.mimetype, [...catalog.clubRegion.keys()]);
     res.json({ text });
+  });
+
+  /** 답변 문장 → 음성(mp3). 음성 답변 켜짐 상태에서 화면이 호출한다. */
+  app.post("/api/speak", async (req, res) => {
+    if (!speaker) throw new HttpError(503, "음성 답변이 설정되지 않았습니다(OPENAI_API_KEY).");
+    const { text } = SpeakBody.parse(req.body);
+    const audio = await speaker.speak(text);
+    res.set({ "content-type": "audio/mpeg", "cache-control": "no-store" }).send(audio);
   });
 
   app.use("/api", (_req, _res, next) => next(new HttpError(404, "없는 API입니다.")));

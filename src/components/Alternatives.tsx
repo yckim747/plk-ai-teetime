@@ -9,7 +9,7 @@ interface Props {
 /** 결과가 없거나 적을 때 조건을 하나만 바꾼 대안. 고객이 골라야 조건이 바뀐다. */
 export function Alternatives({ items, onPick }: Props) {
   return (
-    <section className="block">
+    <section className="block" id="alternatives">
       <h2>이렇게 바꾸면 가능해요</h2>
       <div className="alts">
         {items.map((a) => (

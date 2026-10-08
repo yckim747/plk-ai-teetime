@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api";
+import { stopSpeaking, unlockAudio } from "../speech";
 
 const MAX_SECONDS = 60;
 const MIME_TYPES = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg;codecs=opus"];
@@ -25,6 +26,9 @@ export function VoiceButton({ disabled, onText, onError }: Props) {
   }
 
   async function start() {
+    // 녹음 중에 음성 답변이 마이크로 들어가지 않게 멈추고, 이 터치로 오디오 재생을 허용받아 둔다.
+    stopSpeaking();
+    unlockAudio();
     if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
       onError("이 브라우저는 음성 녹음을 지원하지 않습니다. (localhost 또는 HTTPS에서 최신 브라우저를 이용해 주세요)");
       return;
@@ -73,7 +77,7 @@ export function VoiceButton({ disabled, onText, onError }: Props) {
     }, 250);
   }
 
-  const label = state === "recording" ? `녹음 중 ${seconds}초 · 눌러서 종료` : state === "transcribing" ? "인식 중…" : "음성으로 문의";
+  const label = state === "recording" ? `녹음 중 ${seconds}초 · 눌러서 종료` : state === "transcribing" ? "인식 중…" : "눌러서 말하기";
 
   return (
     <button

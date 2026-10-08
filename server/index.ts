@@ -5,6 +5,7 @@ import OpenAI from "openai";
 import { createApp } from "./app";
 import { todaySeoul } from "./dates";
 import { OpenAIQueryParser } from "./nlu/parseQuery";
+import { OpenAISpeaker } from "./nlu/speak";
 import { OpenAITranscriber } from "./nlu/transcribe";
 import { CsvSource } from "./source/CsvSource";
 
@@ -27,6 +28,7 @@ const app = createApp({
   source,
   parser: client && new OpenAIQueryParser(client, process.env.OPENAI_MODEL || "gpt-4.1-mini"),
   transcriber: client && new OpenAITranscriber(client, process.env.OPENAI_STT_MODEL || "gpt-4o-transcribe"),
+  speaker: client && new OpenAISpeaker(client, process.env.OPENAI_TTS_MODEL || "gpt-4o-mini-tts", process.env.OPENAI_TTS_VOICE || "nova"),
   today: () => todaySeoul(),
 });
 
