@@ -40,6 +40,8 @@ if (existsSync(dist)) {
 app
   .listen(port, host, () => {
     console.log(`[server] http://${host}:${port}  AI: ${client ? "사용" : "미설정(수동 검색만)"}  데이터: ${csvPath}`);
+    const { CODESPACE_NAME, GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN: domain } = process.env;
+    if (CODESPACE_NAME && domain) console.log(`[server] Codespaces 주소: https://${CODESPACE_NAME}-${port}.${domain}`);
   })
   .on("error", (err) => {
     console.error(`[server] ${host}:${port} 시작 실패:`, err.message);

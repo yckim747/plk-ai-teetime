@@ -1,16 +1,16 @@
 {
   "name": "PLK AI 티타임",
   "image": "mcr.microsoft.com/devcontainers/javascript-node:24",
+  "containerEnv": { "HOST": "0.0.0.0" },
   "postCreateCommand": "npm ci",
-  "forwardPorts": [3001, 5173],
+  // 코드스페이스가 켜질 때마다 앱을 빌드해 3001 포트로 띄운다. 로그: /tmp/app.log
+  "postStartCommand": "nohup bash -c 'npm run demo > /tmp/app.log 2>&1 &'",
+  "forwardPorts": [3001],
   "portsAttributes": {
-    "3001": { "label": "앱(빌드본)", "onAutoForward": "openBrowser" },
-    "5173": { "label": "개발 서버", "onAutoForward": "openBrowser" }
+    "3001": { "label": "PLK AI 티타임", "onAutoForward": "openBrowser" },
+    "5173": { "label": "개발 서버(npm run dev)" }
   },
   "secrets": {
     "OPENAI_API_KEY": { "description": "자연어 해석·음성 인식용 OpenAI API 키 (서버에서만 사용)" }
-  },
-  "customizations": {
-    "vscode": { "extensions": ["dbaeumer.vscode-eslint", "esbenp.prettier-vscode"] }
   }
 }
