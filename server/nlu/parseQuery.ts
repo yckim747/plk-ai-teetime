@@ -1,11 +1,13 @@
 import type OpenAI from "openai";
-import { DATE_RE, SORTS, TIME_RE, type SearchCriteria } from "../../shared/types";
+import { DATE_RE, SORTS, TIME_RE, type HistoryTurn, type SearchCriteria } from "../../shared/types";
 import { addDays, dateRange, formatDate, weekdayIndex } from "../dates";
 import type { CatalogData } from "../source/TeeTimeSource";
 
 export interface ParseInput {
   message: string;
   prev?: SearchCriteria;
+  /** 최근 대화(오래된 순). "근처", "거기" 같은 말을 해석하는 데 쓴다. */
+  history?: HistoryTurn[];
   catalog: CatalogData;
   today: string;
 }
@@ -17,6 +19,8 @@ export interface ParsedQuery {
   needsClarification: boolean;
   question: string | null;
   suggestions: string[];
+  /** 목록에 없는 골프장이 실제로 있는 곳과 가까운 지역 */
+  nearRegions: string[];
 }
 
 export interface QueryParser {
@@ -38,6 +42,7 @@ interface RawOutput {
   needsClarification: boolean;
   question: string | null;
   suggestions: string[];
+  nearRegions: string[];
 }
 
 const nullable = (type: string) => ({ type: [type, "null"] });
@@ -48,7 +53,7 @@ export function outputSchema(regions: string[]) {
     additionalProperties: false,
     required: [
       "dates", "anyDate", "regions", "clubs", "timeFrom", "timeTo", "preferredTime",
-      "maxFee", "minFee", "sort", "needsClarification", "question", "suggestions",
+      "maxFee", "minFee", "sort", "needsClarification", "question", "suggestions", "nearRegions",
     ],
     properties: {
       dates: { type: "array", items: { type: "string" }, description: "YYYY-MM-DD" },
@@ -64,6 +69,7 @@ export function outputSchema(regions: string[]) {
       needsClarification: { type: "boolean" },
       question: nullable("string"),
       suggestions: { type: "array", items: { type: "string" } },
+      nearRegions: { type: "array", items: { type: "string", enum: regions } },
     },
   } as const;
 }
@@ -97,7 +103,7 @@ ${calendar(today, catalog.dateTo)}
 ${clubs}
 
 규칙:
-1. clubs: 고객이 말한 골프장을 위 목록의 정식 이름으로 넣는다(예: "써닝포인트" → "써닝포인트컨트리클럽"). 목록에 없는 골프장이면 되묻지 말고 고객이 말한 이름 그대로 넣는다(서버가 안내한다). 골프장을 말하면 regions는 비워도 된다.
+1. clubs: 고객이 말한 골프장을 위 목록의 정식 이름으로 넣는다(예: "써닝포인트" → "써닝포인트컨트리클럽"). 목록에 없는 골프장이면 되묻지 말고 고객이 말한 이름 그대로 넣고(서버가 안내한다), 그 골프장이 실제로 있는 곳을 알면 nearRegions에 가장 가까운 지역 1~2개를 넣는다(예: 남서울CC는 성남 → 한강이남). 그 외에는 nearRegions=[]. 골프장을 말하면 regions는 비워도 된다.
 2. dates: YYYY-MM-DD 목록. 달력을 보고 계산한다. "주말"=토·일, "평일"=월~금, "이번 주말"=이번 주 토·일, "다음 주 X요일"=다음 주의 X요일, "X일"만 말하면 오늘 이후 가장 가까운 X일, "내일/모레/글피"는 오늘 기준. "10월 둘째 주"처럼 기간이면 해당 날짜 모두.
 3. anyDate: "아무 때나", "날짜 상관없이", "가장 빠른/제일 싼 날" 등 날짜 무관 문의면 true, dates는 [].
 4. 시간: "새벽"=05:00~07:00, "오전"=05:00~12:00, "오후"=12:00~17:00, "저녁/야간/나이트"=17:00~20:00. "X시쯤/X시경/X시 정도"는 preferredTime=X시, timeFrom/timeTo는 그 앞뒤 1시간. "X시 이후/넘어서"는 timeFrom, "X시 전/까지"는 timeTo. 오전·오후 언급 없이 1~4시는 13~16시, 5~11시는 오전으로 본다. 시간 표기는 24시간 HH:mm.
@@ -108,7 +114,8 @@ ${clubs}
    - "더 싼 곳": sort="price" (기존 예산 유지). "~도 포함/추가": 해당 항목을 기존 목록에 더한다. "~빼고": 해당 항목 제거. "가격 상관없어": 예산 제거.
    - 날짜와 장소를 새로 말하는 완전히 새 문의면 이전 조건을 버리고 새로 만든다. "처음부터/초기화"면 모두 비운다.
 8. needsClarification: 티타임과 무관한 말이거나, 날짜·지역·골프장이 모두 없어 무엇을 찾을지 알 수 없을 때 true. question에 짧은 한국어 질문, suggestions에는 고객이 그대로 눌러 보낼 수 있는 구체적인 문의 2~4개를 넣되, 각 문의에 날짜와 지역이 모두 들어가야 한다(예: "이번 주말 한강이남 오전", "다음 주 토요일 제주도"). "저렴한 곳"·"티타임 예약"처럼 막연한 제안은 금지. 그 외에는 false, question=null, suggestions=[].
-9. 인원·카트·캐디·홀 수 등 데이터에 없는 조건은 무시한다. 알 수 없는 값은 null 또는 빈 배열.`;
+9. 최근 대화가 주어지면 참고해서 "근처", "거기", "그 골프장", "아까 그 날" 같은 표현이 무엇을 가리키는지 해석한다. 예: 직전에 목록에 없는 골프장을 물었고 고객이 "가까운 곳/근처 골프장"을 물으면, clubs는 비우고 그 골프장이 있는 곳의 지역을 regions에 넣고 날짜 등 나머지 조건은 이어 간다.
+10. 인원·카트·캐디·홀 수 등 데이터에 없는 조건은 무시한다. 알 수 없는 값은 null 또는 빈 배열.`;
 }
 
 const valid = (re: RegExp) => (v: string | null) => (v && re.test(v) ? v : undefined);
@@ -132,6 +139,7 @@ export function toParsedQuery(raw: RawOutput): ParsedQuery {
     needsClarification: raw.needsClarification,
     question: raw.question,
     suggestions: raw.suggestions.slice(0, 4),
+    nearRegions: raw.nearRegions ?? [],
   };
 }
 
@@ -142,8 +150,11 @@ export class OpenAIQueryParser implements QueryParser {
     private readonly model: string,
   ) {}
 
-  async parse({ message, prev, catalog, today }: ParseInput): Promise<ParsedQuery> {
-    const user = `이전 조건: ${prev ? JSON.stringify(prev) : "없음"}\n고객 문장: "${message}"`;
+  async parse({ message, prev, history = [], catalog, today }: ParseInput): Promise<ParsedQuery> {
+    const recent = history.length
+      ? `최근 대화(오래된 순):\n${history.map((h) => `${h.role === "user" ? "고객" : "상담"}: ${h.text}`).join("\n")}\n`
+      : "";
+    const user = `${recent}이전 조건: ${prev ? JSON.stringify(prev) : "없음"}\n고객 문장: "${message}"`;
     const tuning = /^(gpt-5|o\d)/.test(this.model) ? { reasoning: { effort: "low" as const } } : { temperature: 0 };
     const res = await this.client.responses.create({
       model: this.model,

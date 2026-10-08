@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { formatDate } from "../shared/format";
 import type { CatalogInfo, FeaturedSection, QueryResponse, Recommendation, SearchCriteria, SearchResult, TeeTime } from "../shared/types";
 import { api } from "./api";
@@ -23,6 +23,8 @@ type Msg = UserMsg | AssistantMsg;
 type SheetState = { kind: "detail"; rec: Recommendation } | { kind: "all"; result: SearchResult } | null;
 
 const VOICE_REPLY_KEY = "plk.voiceReply";
+/** 맥락 이해용으로 AI에 넘기는 최근 대화 수 */
+const HISTORY_TURNS = 6;
 let nextId = 1;
 
 function loadVoiceReply(): boolean {
@@ -50,6 +52,8 @@ export function App() {
   const [busy, setBusy] = useState(false);
   const [voiceReply, setVoiceReply] = useState(loadVoiceReply);
   const [sheet, setSheet] = useState<SheetState>(null);
+  const [devOpen, setDevOpen] = useState(false);
+  const threadEnd = useRef<HTMLDivElement>(null);
   const aiEnabled = catalog?.aiEnabled ?? false;
 
   const push = useCallback((m: Omit<UserMsg, "id"> | Omit<AssistantMsg, "id">) => {
@@ -62,13 +66,14 @@ export function App() {
     api.featured().then(setFeatured, () => setFeatured([]));
   }, [pushError]);
 
-  // 새 답변이 오면 답변 시작 위치로, 내가 보낸 말·로딩은 맨 아래로 스크롤
+  // 새 답변이 오면 답변 시작 위치로, 내가 보낸 말·로딩은 대화의 끝으로 스크롤한다.
+  // (페이지 맨 아래로 보내면 그 아래 테스트 정보까지 내려갔다가 다시 올라와 화면이 튄다)
   useEffect(() => {
     const last = messages[messages.length - 1];
     if (!last) return;
     requestAnimationFrame(() => {
       if (last.role === "assistant") document.getElementById(`m-${last.id}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
-      else window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "smooth" });
+      else threadEnd.current?.scrollIntoView({ behavior: "smooth", block: "end" });
     });
   }, [messages]);
 
@@ -98,10 +103,15 @@ export function App() {
   async function ask(text: string, viaVoice = false) {
     unlockAudio();
     stopSpeaking();
+    setDevOpen(false);
     push({ role: "user", text, voice: viaVoice });
     setBusy(true);
     try {
-      apply(await api.query(text, criteria), true);
+      const history = messages
+        .filter((m) => !(m.role === "assistant" && m.error))
+        .slice(-HISTORY_TURNS)
+        .map((m) => ({ role: m.role, text: m.text.slice(0, 600) }));
+      apply(await api.query(text, criteria, history), true);
     } catch (e) {
       pushError((e as Error).message);
     } finally {
@@ -111,6 +121,7 @@ export function App() {
 
   async function search(next: SearchCriteria, note: string) {
     setSheet(null);
+    setDevOpen(false);
     push({ role: "user", text: note });
     setBusy(true);
     try {
@@ -183,9 +194,10 @@ export function App() {
                   티타임을 찾고 있어요
                 </div>
               )}
+              <div ref={threadEnd} className="thread-end" aria-hidden />
             </div>
           )}
-          <DevInfo catalog={catalog} busy={busy} onSearch={search} />
+          <DevInfo catalog={catalog} busy={busy} open={devOpen} onToggle={setDevOpen} onSearch={search} />
         </div>
       </main>
 

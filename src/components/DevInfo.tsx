@@ -5,6 +5,8 @@ import { ManualFilter } from "./ManualFilter";
 interface Props {
   catalog: CatalogInfo | null;
   busy: boolean;
+  open: boolean;
+  onToggle: (open: boolean) => void;
   onSearch: (c: SearchCriteria, note: string) => void;
 }
 
@@ -12,14 +14,15 @@ const TRY = [
   "이번 주 토요일 오전 한강이남 25만원 이하",
   "→ 좀 더 늦게 / 한강이북도 포함해줘 / 더 싼 곳 없어? / 토요일 말고 일요일로",
   "10월 24일 제주도 새벽 10만원 이하 (결과 0건 → 대안 제안)",
-  "남서울CC 다음 주 토요일 (데이터에 없는 골프장)",
+  "남서울CC 다음 주 토요일 (데이터에 없는 골프장 → 가까운 지역 대안)",
+  "→ 가장 가까운 근처 골프장 알려줘 (앞 대화 맥락 이어가기)",
   "처음부터 다시",
 ];
 
 /** 페이지 맨 아래: 개발·검수 담당자용 정보 (기본 접힘) */
-export function DevInfo({ catalog, busy, onSearch }: Props) {
+export function DevInfo({ catalog, busy, open, onToggle, onSearch }: Props) {
   return (
-    <details className="devinfo">
+    <details className="devinfo" open={open} onToggle={(e) => onToggle(e.currentTarget.open)}>
       <summary>테스트 정보 (개발·검수용)</summary>
       {catalog ? (
         <div className="devinfo-body">

@@ -242,7 +242,7 @@ describe("HTTP API", () => {
   it("/api/query는 파싱 결과로 검색하고, 날짜가 없으면 되묻는다", async () => {
     const parser: QueryParser = {
       async parse({ message, prev }) {
-        const base = { anyDate: false, needsClarification: false, question: null, suggestions: [] };
+        const base = { anyDate: false, needsClarification: false, question: null, suggestions: [], nearRegions: [] };
         if (message === "웅포") return { ...base, criteria: c({ clubs: ["웅포"] }) };
         if (message === "한강이북") return { ...base, criteria: c({ regions: ["한강이북"] }) };
         return { ...base, criteria: { ...(prev ?? c()), sort: "price" } };
@@ -273,6 +273,33 @@ describe("HTTP API", () => {
     });
     await withServer(undefined, async (base) => {
       assert.equal((await post(`${base}/api/speak`, { text: "안녕" })).status, 503);
+    });
+  });
+
+  it("데이터에 없는 골프장이면 가까운 지역을 대안으로 보여주고, 최근 대화를 파서에 넘긴다", async () => {
+    let seenHistory: unknown;
+    const parser: QueryParser = {
+      async parse({ history }) {
+        seenHistory = history;
+        return {
+          criteria: c({ clubs: ["남서울CC"], dates: ["2026-10-10"] }),
+          anyDate: false,
+          needsClarification: false,
+          question: null,
+          suggestions: [],
+          nearRegions: ["한강이북"],
+        };
+      },
+    };
+    await withServer(parser, async (base) => {
+      const history = [{ role: "user", text: "남서울CC 이번 토요일" }];
+      const body = await (await post(`${base}/api/query`, { message: "근처 골프장", history })).json();
+      assert.deepEqual(seenHistory, history);
+      assert.match(body.reply, /남서울CC.*가까운 한강이북/);
+      assert.equal(body.result.total, 0);
+      assert.equal(body.result.alternatives[0].criteria.regions[0], "한강이북");
+      assert.equal(body.result.alternatives[0].items[0].teeTime.club, "D컨트리클럽");
+      assert.deepEqual(body.criteria.dates, ["2026-10-10"], "원래 조건(날짜)은 유지");
     });
   });
 

@@ -36,6 +36,12 @@ export interface TeeTime {
   fee: number | null;
 }
 
+/** 맥락 이해용으로 AI에 함께 넘기는 최근 대화 */
+export interface HistoryTurn {
+  role: "user" | "assistant";
+  text: string;
+}
+
 export interface Recommendation {
   teeTime: TeeTime;
   score: number;

@@ -53,7 +53,7 @@ export function parseTeeTimeCsv(text: string): { rows: TeeTime[]; skipped: numbe
   return { rows, skipped };
 }
 
-function buildSnapshot(rows: TeeTime[], mtimeMs: number): Snapshot {
+function buildSnapshot(rows: TeeTime[], mtimeMs: number, updatedAt = new Date(mtimeMs)): Snapshot {
   const byDate = new Map<string, TeeTime[]>();
   const regions = new Map<string, string[]>();
   const clubRegion = new Map<string, string>();
@@ -76,7 +76,7 @@ function buildSnapshot(rows: TeeTime[], mtimeMs: number): Snapshot {
     rows,
     byDate,
     mtimeMs,
-    catalog: { regions, clubRegion, dateFrom, dateTo, totalRows: rows.length, updatedAt: new Date(mtimeMs) },
+    catalog: { regions, clubRegion, dateFrom, dateTo, totalRows: rows.length, updatedAt },
   };
 }
 
@@ -88,7 +88,14 @@ export class CsvSource implements TeeTimeSource {
   private snapshot?: Snapshot;
   private loading?: Promise<Snapshot>;
 
-  constructor(private readonly path: string) {}
+  /**
+   * @param updatedAt 데이터 갱신 시각. 없으면 파일 수정 시각을 쓴다.
+   *   (Vercel은 배포 파일의 수정 시각을 고정값으로 바꾸므로 빌드 때 원본 시각을 넘긴다)
+   */
+  constructor(
+    private readonly path: string,
+    private readonly updatedAt?: Date,
+  ) {}
 
   private async current(): Promise<Snapshot> {
     const { mtimeMs } = await stat(this.path);
@@ -96,7 +103,7 @@ export class CsvSource implements TeeTimeSource {
     this.loading ??= (async () => {
       try {
         const { rows, skipped } = parseTeeTimeCsv(await readFile(this.path, "utf8"));
-        this.snapshot = buildSnapshot(rows, mtimeMs);
+        this.snapshot = buildSnapshot(rows, mtimeMs, this.updatedAt);
         console.log(`[data] ${this.path} 적재: ${rows.length}행${skipped ? `, 형식 오류 ${skipped}행 제외` : ""}`);
         return this.snapshot;
       } catch (err) {

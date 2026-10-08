@@ -5,7 +5,7 @@
  * 배포: npm run deploy:vercel
  */
 import { execSync } from "node:child_process";
-import { cpSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { build } from "esbuild";
 
 const OUT = ".vercel/output";
@@ -27,10 +27,13 @@ await build({
   logLevel: "info",
 });
 
-mkdirSync(`${FN}/data`, { recursive: true });
-cpSync(process.env.TEETIME_CSV || "data/teetimes.csv", `${FN}/data/teetimes.csv`);
-
 const json = (path, data) => writeFileSync(path, JSON.stringify(data, null, 2));
+
+const csv = process.env.TEETIME_CSV || "data/teetimes.csv";
+mkdirSync(`${FN}/data`, { recursive: true });
+cpSync(csv, `${FN}/data/teetimes.csv`);
+// Vercel은 배포 파일 수정 시각을 고정값으로 바꾸므로 원본 시각을 따로 기록한다.
+json(`${FN}/data/meta.json`, { dataUpdatedAt: statSync(csv).mtime.toISOString() });
 json(`${FN}/.vc-config.json`, {
   runtime: "nodejs22.x",
   handler: "index.mjs",

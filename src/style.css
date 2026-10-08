@@ -467,6 +467,11 @@ button:disabled {
   margin-bottom: 8px;
   word-break: keep-all;
 }
+.thread-end {
+  height: 1px;
+  /* 하단 입력창에 가리지 않도록 */
+  scroll-margin-bottom: calc(110px + env(safe-area-inset-bottom));
+}
 .typing {
   display: flex;
   align-items: center;

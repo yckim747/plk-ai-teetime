@@ -2,13 +2,14 @@ import express, { type NextFunction, type Request, type Response } from "express
 import multer from "multer";
 import OpenAI from "openai";
 import { z } from "zod";
-import { SearchCriteriaSchema, type Clarification, type FeaturedSection, type ModelInfo, type QueryResponse, type SearchCriteria } from "../shared/types";
+import { SearchCriteriaSchema, type Alternative, type Clarification, type FeaturedSection, type ModelInfo, type QueryResponse, type SearchCriteria } from "../shared/types";
 import { normalizeCriteria, noticesFor, toCatalogInfo } from "./catalog";
 import type { QueryParser } from "./nlu/parseQuery";
 import type { Speaker } from "./nlu/speak";
 import type { Transcriber } from "./nlu/transcribe";
 import { buildReply, buildSpeech } from "./reply";
 import { featuredSections } from "./search/featured";
+import { pickTop, rankTeeTimes } from "./search/recommend";
 import { runSearch } from "./search/service";
 import type { CatalogData, TeeTimeSource } from "./source/TeeTimeSource";
 
@@ -28,6 +29,10 @@ const MAX_AUDIO_BYTES = 10 * 1024 * 1024;
 const QueryBody = z.object({
   message: z.string().trim().min(1).max(500),
   prevCriteria: SearchCriteriaSchema.optional(),
+  history: z
+    .array(z.object({ role: z.enum(["user", "assistant"]), text: z.string().max(600) }))
+    .max(10)
+    .optional(),
 });
 const SearchBody = z.object({ criteria: SearchCriteriaSchema });
 const SpeakBody = z.object({ text: z.string().trim().min(1).max(600) });
@@ -48,12 +53,38 @@ export function createApp({ source, parser, transcriber, speaker, models, today 
   app.use(express.json({ limit: "100kb" }));
   const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_AUDIO_BYTES, files: 1 } });
 
-  async function searchResponse(criteria: SearchCriteria, catalog: CatalogData, extraNotices: string[] = []): Promise<QueryResponse> {
+  /**
+   * @param nearRegions 말한 골프장이 데이터에 없을 때, 그 골프장과 가까운 지역 (AI가 판단)
+   */
+  async function searchResponse(criteria: SearchCriteria, catalog: CatalogData, nearRegions: string[] = []): Promise<QueryResponse> {
     const n = normalizeCriteria(criteria, catalog);
-    const notices = [...extraNotices, ...noticesFor(n, catalog)];
+    const notices = noticesFor(n, catalog);
     const dataUpdatedAt = catalog.updatedAt.toISOString();
-    // 말한 골프장이 하나도 데이터에 없으면 전체를 검색하지 않고 다시 묻는다. 날짜 등 나머지 조건은 유지된다.
+    // 말한 골프장이 하나도 데이터에 없으면 전체를 검색하지 않는다.
+    // 가까운 지역을 알면 그 지역 티타임을 대안으로 보여주고(조건은 바꾸지 않음), 모르면 다시 묻는다.
     if (criteria.clubs.length && !n.criteria.clubs.length) {
+      const near = nearRegions.filter((r) => catalog.regions.has(r));
+      if (near.length) {
+        const nearCriteria: SearchCriteria = { ...n.criteria, clubs: [], regions: near };
+        const rows = await source.search(nearCriteria);
+        if (rows.length) {
+          const alt: Alternative = {
+            label: `가까운 ${near.join("·")} 지역 골프장`,
+            criteria: nearCriteria,
+            total: rows.length,
+            items: pickTop(rankTeeTimes(rows, nearCriteria), 3),
+          };
+          const reply = `'${n.unmatchedClubs.join("', '")}'은(는) 지금 조회할 수 없어요. 가까운 ${near.join("·")} 지역 골프장은 이런 시간이 있어요.`;
+          return {
+            reply,
+            speech: reply,
+            criteria: n.criteria,
+            result: { criteria: n.criteria, total: 0, clubCount: 0, items: [], recommendations: [], alternatives: [alt] },
+            notices: noticesFor({ ...n, unmatchedClubs: [] }, catalog),
+            dataUpdatedAt,
+          };
+        }
+      }
       const when = n.criteria.dates.length ? "" : "이번 주말 ";
       const clarification: Clarification = {
         question: "말씀하신 골프장은 지금 조회할 수 없어요. 다른 지역으로 찾아드릴까요?",
@@ -91,9 +122,9 @@ export function createApp({ source, parser, transcriber, speaker, models, today 
   /** 자연어 문의 → 조건 추출 → 검색·추천 */
   app.post("/api/query", async (req, res) => {
     if (!parser) throw new HttpError(503, "AI 기능이 설정되지 않았습니다(OPENAI_API_KEY). 수동 필터로 검색해 주세요.");
-    const { message, prevCriteria } = QueryBody.parse(req.body);
+    const { message, prevCriteria, history } = QueryBody.parse(req.body);
     const catalog = await source.catalog();
-    const parsed = await parser.parse({ message, prev: prevCriteria, catalog, today: today() });
+    const parsed = await parser.parse({ message, prev: prevCriteria, history, catalog, today: today() });
     const c = parsed.criteria;
     const noTarget = !c.dates.length && !parsed.anyDate && !c.clubs.length;
     if (parsed.needsClarification || noTarget) {
@@ -112,7 +143,7 @@ export function createApp({ source, parser, transcriber, speaker, models, today 
       } satisfies QueryResponse);
       return;
     }
-    res.json(await searchResponse(c, catalog));
+    res.json(await searchResponse(c, catalog, parsed.nearRegions));
   });
 
   /** 음성(webm/mp4 등) → 텍스트. 음성은 메모리에서만 처리하고 저장하지 않는다. */

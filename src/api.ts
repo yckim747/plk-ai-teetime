@@ -1,4 +1,4 @@
-import type { CatalogInfo, FeaturedSection, QueryResponse, SearchCriteria } from "../shared/types";
+import type { CatalogInfo, FeaturedSection, HistoryTurn, QueryResponse, SearchCriteria } from "../shared/types";
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, init);
@@ -16,8 +16,8 @@ const json = (body: unknown): RequestInit => ({
 export const api = {
   catalog: () => request<CatalogInfo>("/api/catalog"),
   featured: () => request<FeaturedSection[]>("/api/featured"),
-  query: (message: string, prevCriteria: SearchCriteria | null) =>
-    request<QueryResponse>("/api/query", json({ message, prevCriteria: prevCriteria ?? undefined })),
+  query: (message: string, prevCriteria: SearchCriteria | null, history: HistoryTurn[]) =>
+    request<QueryResponse>("/api/query", json({ message, prevCriteria: prevCriteria ?? undefined, history })),
   search: (criteria: SearchCriteria) => request<QueryResponse>("/api/search", json({ criteria })),
   transcribe: (audio: Blob, filename: string) => {
     const fd = new FormData();

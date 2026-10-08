@@ -6,7 +6,7 @@
  */
 import { resolve } from "node:path";
 import OpenAI from "openai";
-import type { SearchCriteria } from "../shared/types";
+import type { HistoryTurn, SearchCriteria } from "../shared/types";
 import { normalizeCriteria } from "../server/catalog";
 import { OpenAIQueryParser } from "../server/nlu/parseQuery";
 import { CsvSource } from "../server/source/CsvSource";
@@ -18,10 +18,11 @@ try {
 const TODAY = "2026-10-08";
 const model = process.argv[2] || process.env.OPENAI_MODEL || "gpt-4.1-mini";
 
-type Expect = Partial<Record<keyof SearchCriteria, unknown>> & { anyDate?: boolean; clarify?: boolean; unmatched?: boolean };
+type Expect = Partial<Record<keyof SearchCriteria, unknown>> & { anyDate?: boolean; clarify?: boolean; unmatched?: boolean; near?: string[] };
 interface Case {
   text: string;
   prev?: SearchCriteria;
+  history?: HistoryTurn[];
   expect: Expect;
 }
 
@@ -37,7 +38,17 @@ const CASES: Case[] = [
   { text: "10월 20일 해운대 컨트리클럽", expect: { dates: ["2026-10-20"], clubs: ["해운대 컨트리클럽"] } },
   // 스카이72는 클럽72의 옛 이름
   { text: "스카이72 이번 주말", expect: { dates: ["2026-10-10", "2026-10-11"], clubs: ["클럽72"] } },
-  { text: "남서울CC 다음 주 토요일", expect: { dates: ["2026-10-17"], unmatched: true } },
+  { text: "남서울CC 다음 주 토요일", expect: { dates: ["2026-10-17"], unmatched: true, near: ["한강이남"] } },
+  // 대화 맥락: 데이터에 없는 골프장 다음에 "근처"를 물음
+  {
+    text: "가장 가까운 근처 골프장 알려줘.",
+    prev: { dates: ["2026-10-17"], regions: [], clubs: [], sort: "recommend" },
+    history: [
+      { role: "user", text: "남서울 CC 다음 주 토요일 티타임 알려줘" },
+      { role: "assistant", text: "말씀하신 골프장은 지금 조회할 수 없어요. 다른 지역으로 찾아드릴까요?" },
+    ],
+    expect: { dates: ["2026-10-17"], regions: ["한강이남"], clubs: [] },
+  },
   { text: "안녕하세요", expect: { clarify: true } },
   { text: "강원도 제일 싼 티타임 아무때나", expect: { anyDate: true, regions: ["강원도"], sort: "price" } },
   { text: "17일 춘천 오후 3시 이후", expect: { dates: ["2026-10-17"], regions: ["강원도"], timeFrom: "15:00" } },
@@ -75,15 +86,15 @@ async function main() {
       for (let item = queue.shift(); item; item = queue.shift()) {
         const [i, tc] = item;
         const t0 = performance.now();
-        const parsed = await parser.parse({ message: tc.text, prev: tc.prev, catalog, today: TODAY });
+        const parsed = await parser.parse({ message: tc.text, prev: tc.prev, history: tc.history, catalog, today: TODAY });
         latencies.push(performance.now() - t0);
         const n = normalizeCriteria(parsed.criteria, catalog);
-        const got: Record<string, unknown> = { ...n.criteria, anyDate: parsed.anyDate, clarify: parsed.needsClarification, unmatched: n.unmatchedClubs.length > 0 };
+        const got: Record<string, unknown> = { ...n.criteria, anyDate: parsed.anyDate, clarify: parsed.needsClarification, unmatched: n.unmatchedClubs.length > 0, near: parsed.nearRegions };
         const diffs = Object.entries(tc.expect)
           .filter(([k, v]) => norm(got[k]) !== norm(v))
           .map(([k, v]) => `${k}: 기대 ${norm(v)} / 실제 ${norm(got[k])}`);
         if (!diffs.length) pass++;
-        lines[i] = `${diffs.length ? "✗" : "✓"} ${tc.prev ? "(후속) " : ""}${tc.text}${diffs.map((d) => `\n    ${d}`).join("")}`;
+        lines[i] = `${diffs.length ? "✗" : "✓"} ${tc.history ? "(맥락) " : tc.prev ? "(후속) " : ""}${tc.text}${diffs.map((d) => `\n    ${d}`).join("")}`;
       }
     }),
   );
