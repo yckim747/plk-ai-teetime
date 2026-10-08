@@ -15,31 +15,13 @@
   --warn-soft: #fff4e0;
   --shadow: 0 1px 2px rgb(16 24 40 / 0.05), 0 2px 8px rgb(16 24 40 / 0.04);
   --column: 760px;
-  color-scheme: light dark;
+  /* 기기·시간과 상관없이 항상 밝은 화면 (자동 다크 모드 적용 안 함) */
+  color-scheme: only light;
   font-family: "Pretendard", "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif;
   color: var(--text);
   background: var(--bg);
   line-height: 1.5;
   -webkit-text-size-adjust: 100%;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0e1217;
-    --surface: #1a2129;
-    --card: #161c23;
-    --text: #e7edf3;
-    --muted: #97a3b1;
-    --line: #2a333d;
-    --brand: #4f97d8;
-    --brand-soft: #16283b;
-    --brand-text: #a9d0f5;
-    --user-bg: #1f2a36;
-    --danger: #ff6b5e;
-    --warn: #f2b84b;
-    --warn-soft: #33290f;
-    --shadow: none;
-  }
 }
 
 * {
@@ -109,15 +91,7 @@ button:disabled {
   height: 22px;
   width: auto;
 }
-@media (prefers-color-scheme: dark) {
-  /* 로고의 남색 글자가 어두운 배경에 묻히지 않게 */
-  .logo {
-    background: #fff;
-    border-radius: 6px;
-    padding: 4px 6px;
-    height: 30px;
-  }
-}
+
 .header-actions {
   display: flex;
   align-items: center;
