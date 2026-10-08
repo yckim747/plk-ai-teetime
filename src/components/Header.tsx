@@ -1,4 +1,4 @@
-import { NewChatIcon, SpeakerIcon, SpeakerOffIcon } from "../icons";
+import { RefreshIcon, SpeakerIcon, SpeakerOffIcon } from "../icons";
 
 interface Props {
   voiceReply: boolean;
@@ -8,7 +8,7 @@ interface Props {
   onNewChat: () => void;
 }
 
-/** 상단: 로고와 아이콘 두 개만 (ChatGPT형 최소 헤더) */
+/** 상단: 로고, 음성 답변 켜기/끄기, (대화 중일 때만) 새로 찾기 */
 export function Header({ voiceReply, showVoiceToggle, canReset, onToggleVoice, onNewChat }: Props) {
   return (
     <header className="header">
@@ -29,9 +29,12 @@ export function Header({ voiceReply, showVoiceToggle, canReset, onToggleVoice, o
               {voiceReply ? <SpeakerIcon /> : <SpeakerOffIcon />}
             </button>
           )}
-          <button type="button" className="icon-btn" onClick={onNewChat} disabled={!canReset} aria-label="새로 찾기" title="새로 찾기">
-            <NewChatIcon />
-          </button>
+          {canReset && (
+            <button type="button" className="reset-btn" onClick={onNewChat} title="대화를 지우고 처음 화면으로">
+              <RefreshIcon width={16} height={16} />
+              새로 찾기
+            </button>
+          )}
         </div>
       </div>
     </header>

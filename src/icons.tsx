@@ -48,9 +48,9 @@ export const SpeakerOffIcon = (p: SVGProps<SVGSVGElement>) => (
   </Icon>
 );
 
-export const NewChatIcon = (p: SVGProps<SVGSVGElement>) => (
+export const RefreshIcon = (p: SVGProps<SVGSVGElement>) => (
   <Icon {...p}>
-    <path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
+    <path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7" />
   </Icon>
 );
 
