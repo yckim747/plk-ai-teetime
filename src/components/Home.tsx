@@ -49,8 +49,9 @@ export function Home({ featured, aiEnabled, onSelect, onMore, onAsk, onOpenFilte
               </button>
             </div>
             <Carousel label={s.title}>
-              {s.items.map((rec) => (
-                <TeeCard key={rec.teeTime.id} rec={rec} showReason={false} onSelect={onSelect} />
+              {/* 섹션마다 첫 카드(가장 점수가 높은 티타임)에 "★ 추천" */}
+              {s.items.map((rec, i) => (
+                <TeeCard key={rec.teeTime.id} rec={rec} showReason={false} highlight={i === 0} onSelect={onSelect} />
               ))}
             </Carousel>
           </section>
