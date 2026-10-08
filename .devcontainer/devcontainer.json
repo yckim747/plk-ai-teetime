@@ -1,0 +1,16 @@
+{
+  "name": "PLK AI 티타임",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:24",
+  "postCreateCommand": "npm ci",
+  "forwardPorts": [3001, 5173],
+  "portsAttributes": {
+    "3001": { "label": "앱(빌드본)", "onAutoForward": "openBrowser" },
+    "5173": { "label": "개발 서버", "onAutoForward": "openBrowser" }
+  },
+  "secrets": {
+    "OPENAI_API_KEY": { "description": "자연어 해석·음성 인식용 OpenAI API 키 (서버에서만 사용)" }
+  },
+  "customizations": {
+    "vscode": { "extensions": ["dbaeumer.vscode-eslint", "esbenp.prettier-vscode"] }
+  }
+}

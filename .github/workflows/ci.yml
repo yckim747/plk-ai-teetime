@@ -1,0 +1,26 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      # 저장소 시크릿 OPENAI_API_KEY가 있을 때만 자연어 평가를 돌린다(유료 호출, 결과는 로그로 확인).
+      - name: NLU 평가
+        if: ${{ env.OPENAI_API_KEY != '' }}
+        run: npm run eval:nlu

@@ -1,0 +1,130 @@
+import express, { type NextFunction, type Request, type Response } from "express";
+import multer from "multer";
+import OpenAI from "openai";
+import { z } from "zod";
+import { SearchCriteriaSchema, type Clarification, type QueryResponse, type SearchCriteria } from "../shared/types";
+import { normalizeCriteria, noticesFor, toCatalogInfo } from "./catalog";
+import type { QueryParser } from "./nlu/parseQuery";
+import type { Transcriber } from "./nlu/transcribe";
+import { buildReply } from "./reply";
+import { runSearch } from "./search/service";
+import type { CatalogData, TeeTimeSource } from "./source/TeeTimeSource";
+
+export interface AppDeps {
+  source: TeeTimeSource;
+  /** 없으면 AI 기능(자연어·음성) 비활성, 수동 검색만 동작 */
+  parser?: QueryParser;
+  transcriber?: Transcriber;
+  today: () => string;
+}
+
+const MAX_AUDIO_BYTES = 10 * 1024 * 1024;
+
+const QueryBody = z.object({
+  message: z.string().trim().min(1).max(500),
+  prevCriteria: SearchCriteriaSchema.optional(),
+});
+const SearchBody = z.object({ criteria: SearchCriteriaSchema });
+
+class HttpError extends Error {
+  constructor(
+    readonly status: number,
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
+const DATE_SUGGESTIONS = ["이번 주말", "다음 주 토요일", "날짜 상관없이 제일 싼 곳"];
+
+export function createApp({ source, parser, transcriber, today }: AppDeps) {
+  const app = express();
+  app.use(express.json({ limit: "100kb" }));
+  const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_AUDIO_BYTES, files: 1 } });
+
+  async function searchResponse(criteria: SearchCriteria, catalog: CatalogData, extraNotices: string[] = []): Promise<QueryResponse> {
+    const n = normalizeCriteria(criteria, catalog);
+    const notices = [...extraNotices, ...noticesFor(n, catalog)];
+    const dataUpdatedAt = catalog.updatedAt.toISOString();
+    // 말한 골프장이 하나도 데이터에 없으면 전체를 검색하지 않고 다시 묻는다. 날짜 등 나머지 조건은 유지된다.
+    if (criteria.clubs.length && !n.criteria.clubs.length) {
+      const when = n.criteria.dates.length ? "" : "이번 주말 ";
+      const clarification: Clarification = {
+        question: "말씀하신 골프장은 지금 조회할 수 없어요. 다른 지역으로 찾아드릴까요?",
+        suggestions: [...catalog.regions.keys()].slice(0, 4).map((r) => `${when}${r}에서 찾아줘`),
+      };
+      return { reply: clarification.question, criteria: n.criteria, clarification, notices, dataUpdatedAt };
+    }
+    const result = await runSearch(source, n.criteria, catalog);
+    return { reply: buildReply(result), criteria: n.criteria, result, notices, dataUpdatedAt };
+  }
+
+  app.get("/api/health", (_req, res) => {
+    res.json({ ok: true });
+  });
+
+  app.get("/api/catalog", async (_req, res) => {
+    res.json(toCatalogInfo(await source.catalog(), !!parser, today()));
+  });
+
+  /** 조건으로 직접 검색 (조건 칩 해제·대안 선택·수동 필터). AI를 호출하지 않는다. */
+  app.post("/api/search", async (req, res) => {
+    const { criteria } = SearchBody.parse(req.body);
+    res.json(await searchResponse(criteria, await source.catalog()));
+  });
+
+  /** 자연어 문의 → 조건 추출 → 검색·추천 */
+  app.post("/api/query", async (req, res) => {
+    if (!parser) throw new HttpError(503, "AI 기능이 설정되지 않았습니다(OPENAI_API_KEY). 수동 필터로 검색해 주세요.");
+    const { message, prevCriteria } = QueryBody.parse(req.body);
+    const catalog = await source.catalog();
+    const parsed = await parser.parse({ message, prev: prevCriteria, catalog, today: today() });
+    const c = parsed.criteria;
+    const noTarget = !c.dates.length && !parsed.anyDate && !c.clubs.length;
+    if (parsed.needsClarification || noTarget) {
+      const clarification: Clarification = {
+        question: parsed.question ?? "언제 라운딩하실 예정인가요?",
+        suggestions: parsed.suggestions.length ? parsed.suggestions : DATE_SUGGESTIONS,
+      };
+      const n = normalizeCriteria(c, catalog);
+      res.json({
+        reply: clarification.question,
+        criteria: n.criteria,
+        clarification,
+        notices: [],
+        dataUpdatedAt: catalog.updatedAt.toISOString(),
+      } satisfies QueryResponse);
+      return;
+    }
+    res.json(await searchResponse(c, catalog));
+  });
+
+  /** 음성(webm/mp4 등) → 텍스트. 음성은 메모리에서만 처리하고 저장하지 않는다. */
+  app.post("/api/transcribe", upload.single("audio"), async (req, res) => {
+    if (!transcriber) throw new HttpError(503, "음성 인식이 설정되지 않았습니다(OPENAI_API_KEY).");
+    if (!req.file?.buffer.length) throw new HttpError(400, "음성 파일이 비어 있습니다.");
+    const catalog = await source.catalog();
+    const text = await transcriber.transcribe(req.file.buffer, req.file.mimetype, [...catalog.clubRegion.keys()]);
+    res.json({ text });
+  });
+
+  app.use("/api", (_req, _res, next) => next(new HttpError(404, "없는 API입니다.")));
+
+  app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
+    if (err instanceof HttpError) {
+      res.status(err.status).json({ error: err.message });
+    } else if (err instanceof z.ZodError) {
+      res.status(400).json({ error: "요청 형식이 올바르지 않습니다.", details: err.issues });
+    } else if (err instanceof multer.MulterError) {
+      res.status(400).json({ error: err.code === "LIMIT_FILE_SIZE" ? "음성 파일이 너무 큽니다(최대 10MB)." : err.message });
+    } else {
+      console.error("[api]", err);
+      const isOpenAI = err instanceof OpenAI.APIError;
+      res.status(isOpenAI ? 502 : 500).json({
+        error: isOpenAI ? "AI 서비스 응답에 실패했습니다. 잠시 후 다시 시도하거나 수동 필터를 이용해 주세요." : "서버 오류가 발생했습니다.",
+      });
+    }
+  });
+
+  return app;
+}
