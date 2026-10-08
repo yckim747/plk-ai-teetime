@@ -13,7 +13,9 @@
     "demo": "npm run build && npm start",
     "test": "node --import tsx --test \"tests/**/*.test.ts\"",
     "typecheck": "tsc --noEmit",
-    "eval:nlu": "tsx scripts/eval-nlu.ts"
+    "eval:nlu": "tsx scripts/eval-nlu.ts",
+    "build:vercel": "node scripts/build-vercel.mjs",
+    "deploy:vercel": "npm run build:vercel && npx vercel deploy --prebuilt --prod --yes"
   },
   "dependencies": {
     "csv-parse": "^7.0.3",
@@ -32,6 +34,7 @@
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.2",
     "concurrently": "^10.0.6",
+    "esbuild": "^0.28.2",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
     "vite": "^8.3.4"

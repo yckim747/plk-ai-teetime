@@ -32,6 +32,15 @@ npm run dev                 # http://localhost:5173 (API는 3001)
 
 `OPENAI_API_KEY`가 없으면 자연어·음성 문의는 꺼지고, 화면의 **직접 고르기** 필터로만 검색합니다. 마이크는 `localhost` 또는 HTTPS에서만 동작합니다.
 
+## 공개 주소 (Vercel)
+
+**https://plk-ai-teetime.vercel.app** — 로그인·동의 화면 없이 바로 열리는 시연용 주소입니다.
+
+- 화면은 Vercel CDN에서, `/api/*`는 서버 함수(`server/vercel.ts`) 하나가 처리합니다. 티타임 CSV는 함수와 함께 배포됩니다.
+- 배포: `npm run deploy:vercel` (처음 한 번 `npx vercel login`, `npx vercel link` 필요). GitHub에 푸시해도 자동 배포되지 않습니다.
+- 환경변수는 Vercel 프로젝트 설정(Production)에 둡니다: `OPENAI_API_KEY`, `OPENAI_MODEL`.
+- **데이터(CSV)를 바꾸면 다시 배포해야 반영됩니다.** 서버리스라 파일 자동 재적재는 로컬·Codespaces에서만 동작합니다.
+
 ## GitHub에서 테스트하기
 
 | 방법 | 용도 | 준비 |
@@ -47,6 +56,7 @@ GitHub Pages는 정적 파일만 제공하므로 이 앱(서버 + 비밀 키 필
 |---|---|
 | `npm run dev` | API(3001) + 웹(5173) 개발 서버 |
 | `npm run demo` | 웹 빌드 후 3001 포트 하나로 실행 |
+| `npm run deploy:vercel` | Vercel 운영 주소로 배포 |
 | `npm test` | 단위·HTTP 통합 테스트 (OpenAI 호출 없음) |
 | `npm run eval:nlu [모델]` | 실제 OpenAI로 문장 24개를 조건으로 변환해 정확도·지연 측정 (기준일 2026-10-08 고정) |
 | `npm run typecheck` | 타입 검사 |

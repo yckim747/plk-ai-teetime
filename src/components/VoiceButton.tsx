@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { api } from "../api";
 import { getAudioContext, stopSpeaking } from "../speech";
 import { createEndpointDetector, rms } from "../voice/endpoint";
+import { acquireMic, pauseMic } from "../voice/mic";
 
 const MAX_SECONDS = 30;
 const TICK_MS = 50;
@@ -61,7 +62,7 @@ export function VoiceButton({ disabled, onText, onError }: Props) {
     }
     let stream: MediaStream;
     try {
-      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream = await acquireMic();
     } catch (e) {
       onError((e as DOMException).name === "NotAllowedError" ? "마이크 권한이 거부되었습니다. 브라우저 주소창에서 마이크를 허용해 주세요." : "마이크를 사용할 수 없습니다.");
       return;
@@ -72,7 +73,7 @@ export function VoiceButton({ disabled, onText, onError }: Props) {
     discard.current = false;
     rec.ondataavailable = (e) => e.data.size && chunks.push(e.data);
     rec.onstop = async () => {
-      stream.getTracks().forEach((t) => t.stop());
+      pauseMic();
       if (discard.current) {
         setState("idle");
         return;

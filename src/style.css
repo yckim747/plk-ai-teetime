@@ -1,17 +1,18 @@
 :root {
-  --bg: #f4f6f3;
+  --bg: #f3f6fa;
   --panel: #ffffff;
-  --text: #1c2420;
-  --muted: #69736d;
-  --line: #e2e7e2;
-  --brand: #157347;
-  --brand-soft: #e5f3eb;
-  --brand-text: #0f5634;
+  --text: #1a2330;
+  --muted: #66717f;
+  --line: #dfe6ee;
+  --brand: #16599d;
+  --brand-soft: #e8f1fb;
+  --brand-text: #0f4a85;
+  --brand-sky: #69abe5;
   --warn: #9a5b00;
   --warn-soft: #fff4dc;
   --danger: #b42318;
   --danger-soft: #fdecea;
-  --user: #157347;
+  --user: #16599d;
   --user-text: #ffffff;
   --shadow: 0 1px 2px rgb(0 0 0 / 0.05), 0 2px 8px rgb(0 0 0 / 0.04);
   --radius: 14px;
@@ -23,19 +24,20 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #111513;
-    --panel: #1a201d;
-    --text: #e6ebe7;
-    --muted: #93a099;
-    --line: #2b3430;
-    --brand: #3fb27a;
-    --brand-soft: #1d3328;
-    --brand-text: #8fe0b5;
+    --bg: #0f141a;
+    --panel: #18202a;
+    --text: #e5ebf2;
+    --muted: #94a1b0;
+    --line: #2a3542;
+    --brand: #69abe5;
+    --brand-soft: #172b40;
+    --brand-text: #a9d0f5;
+    --brand-sky: #69abe5;
     --warn: #f2b84b;
     --warn-soft: #3a2e14;
     --danger: #ff8a80;
     --danger-soft: #3d1f1c;
-    --user: #227a50;
+    --user: #1f5f9e;
     --shadow: none;
   }
 }
@@ -118,10 +120,32 @@ button:disabled {
   align-items: center;
 }
 .logo {
-  font-size: 1.8rem;
+  display: block;
+  height: 34px;
+  width: auto;
+}
+.brand-divider {
+  width: 1px;
+  align-self: stretch;
+  background: var(--line);
 }
 .brand h1 {
-  font-size: 1.15rem;
+  font-size: 1.1rem;
+  color: var(--brand-text);
+}
+@media (prefers-color-scheme: dark) {
+  /* 로고의 남색 글자가 어두운 배경에서 묻히지 않게 흰 바탕 위에 둔다 */
+  .logo {
+    background: #fff;
+    border-radius: 8px;
+    padding: 4px 8px;
+    height: 42px;
+  }
+}
+@media (max-width: 860px) {
+  .logo {
+    height: 26px;
+  }
 }
 .brand p {
   font-size: 0.85rem;
@@ -307,7 +331,7 @@ button:disabled {
   background: var(--brand);
   color: #fff;
   font-size: 1.35rem;
-  box-shadow: 0 2px 8px rgb(21 115 71 / 0.35);
+  box-shadow: 0 2px 8px rgb(22 89 157 / 0.35);
   display: grid;
   place-items: center;
   position: relative;
@@ -702,10 +726,10 @@ button:disabled {
 }
 @keyframes flash {
   0% {
-    box-shadow: 0 0 0 0 rgb(21 115 71 / 0.55);
+    box-shadow: 0 0 0 0 rgb(22 89 157 / 0.5);
   }
   60% {
-    box-shadow: 0 0 0 10px rgb(21 115 71 / 0);
+    box-shadow: 0 0 0 10px rgb(22 89 157 / 0);
   }
 }
 .link {

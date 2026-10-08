@@ -136,11 +136,10 @@ export function App() {
     <div className="app">
       <header className="topbar">
         <div className="brand">
-          <span className="logo" aria-hidden>
-            ⛳
-          </span>
+          <img className="logo" src="/logo-horizontal.png" alt="Pacific Links Korea" width={512} height={81} />
+          <span className="brand-divider" aria-hidden />
           <div>
-            <h1>PLK AI 티타임</h1>
+            <h1>AI 티타임 컨시어지</h1>
             <p>말하거나 입력하면 실시간 잔여 티타임에서 찾아 추천해 드려요</p>
           </div>
         </div>
