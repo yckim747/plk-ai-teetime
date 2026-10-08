@@ -192,8 +192,8 @@ describe("음성 답변 문장", () => {
     const source = new MemorySource(ROWS);
     const r = await runSearch(source, c({ dates: ["2026-10-12"], clubs: ["베어포트리조트CC(구.웅포)"] }), await source.catalog());
     const s = buildSpeech(r);
-    assert.match(s, /^10월 12일 월요일 베어포트리조트CC 조건으로 티타임 1개를 찾았어요/);
-    assert.match(s, /오전 9시, 그린피 12만원입니다/);
+    assert.match(s, /^10월 12일 월요일 베어포트리조트CC에서 찾아봤어요. 티타임 1개가 있고/);
+    assert.match(s, /추천은 베어포트리조트CC 오전 9시, 그린피 12만원이에요/);
     assert.match(s, /화면에서 확인해 주세요/);
     assert.doesNotMatch(s, /[()·~]/);
   });
@@ -210,7 +210,16 @@ describe("프롬프트", () => {
 
 describe("HTTP API", () => {
   async function withServer(parser: QueryParser | undefined, fn: (base: string) => Promise<void>) {
-    const speaker = { speak: async (text: string) => Buffer.from(`mp3:${text}`) };
+    // 조각 여러 개로 흘려보내는 가짜 음성 합성
+    const speaker = {
+      stream: async (text: string) =>
+        new ReadableStream<Uint8Array>({
+          start(controller) {
+            for (const part of ["pcm:", text, ":end"]) controller.enqueue(new TextEncoder().encode(part));
+            controller.close();
+          },
+        }),
+    };
     const app = createApp({ source: new MemorySource(ROWS), parser, speaker: parser && speaker, today: () => "2026-10-08" });
     const server = app.listen(0);
     try {
@@ -263,12 +272,12 @@ describe("HTTP API", () => {
     });
   });
 
-  it("/api/speak는 mp3를 돌려주고, AI 미설정이면 503", async () => {
+  it("/api/speak는 PCM 음성 조각을 이어서 흘려보내고, AI 미설정이면 503", async () => {
     const parser: QueryParser = { parse: async () => { throw new Error("unused"); } };
     await withServer(parser, async (base) => {
       const res = await post(`${base}/api/speak`, { text: "안녕하세요" });
-      assert.equal(res.headers.get("content-type"), "audio/mpeg");
-      assert.equal(Buffer.from(await res.arrayBuffer()).toString(), "mp3:안녕하세요");
+      assert.equal(res.headers.get("content-type"), "audio/pcm;rate=24000");
+      assert.equal(Buffer.from(await res.arrayBuffer()).toString(), "pcm:안녕하세요:end");
       assert.equal((await post(`${base}/api/speak`, { text: "" })).status, 400);
     });
     await withServer(undefined, async (base) => {

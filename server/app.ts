@@ -1,3 +1,5 @@
+import { Readable } from "node:stream";
+import type { ReadableStream as NodeReadableStream } from "node:stream/web";
 import express, { type NextFunction, type Request, type Response } from "express";
 import multer from "multer";
 import OpenAI from "openai";
@@ -5,7 +7,7 @@ import { z } from "zod";
 import { SearchCriteriaSchema, type Alternative, type Clarification, type FeaturedSection, type ModelInfo, type QueryResponse, type SearchCriteria } from "../shared/types";
 import { normalizeCriteria, noticesFor, toCatalogInfo } from "./catalog";
 import type { QueryParser } from "./nlu/parseQuery";
-import type { Speaker } from "./nlu/speak";
+import { PCM_CONTENT_TYPE, type Speaker } from "./nlu/speak";
 import type { Transcriber } from "./nlu/transcribe";
 import { buildReply, buildSpeech } from "./reply";
 import { featuredSections } from "./search/featured";
@@ -155,12 +157,20 @@ export function createApp({ source, parser, transcriber, speaker, models, today 
     res.json({ text });
   });
 
-  /** 답변 문장 → 음성(mp3). 음성 답변 켜짐 상태에서 화면이 호출한다. */
+  /**
+   * 답변 문장 → 음성(PCM 스트림). 만드는 대로 흘려보내서 화면이 받는 즉시 재생한다.
+   * (전체 음성을 다 만든 뒤 보내면 첫 소리까지 3~6초가 걸린다)
+   */
   app.post("/api/speak", async (req, res) => {
     if (!speaker) throw new HttpError(503, "음성 답변이 설정되지 않았습니다(OPENAI_API_KEY).");
     const { text } = SpeakBody.parse(req.body);
-    const audio = await speaker.speak(text);
-    res.set({ "content-type": "audio/mpeg", "cache-control": "no-store" }).send(audio);
+    const audio = Readable.fromWeb((await speaker.stream(text)) as NodeReadableStream<Uint8Array>);
+    res.set({ "content-type": PCM_CONTENT_TYPE, "cache-control": "no-store", "x-accel-buffering": "no" });
+    audio.on("error", (err) => {
+      console.error("[speak] 스트림 오류", err);
+      res.destroy(err);
+    });
+    audio.pipe(res);
   });
 
   app.use("/api", (_req, _res, next) => next(new HttpError(404, "없는 API입니다.")));

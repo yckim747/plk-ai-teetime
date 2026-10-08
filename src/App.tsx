@@ -12,7 +12,7 @@ import { Home } from "./components/Home";
 import { Sheet } from "./components/Sheet";
 import { TeeTimeDetail } from "./components/TeeTimeDetail";
 import { MicIcon } from "./icons";
-import { speak, stopSpeaking, unlockAudio } from "./speech";
+import { playAck, speak, stopSpeaking, unlockAudio } from "./speech";
 
 interface UserMsg {
   id: number;
@@ -90,20 +90,23 @@ export function App() {
     }
   }
 
-  function playSpeech(text: string) {
-    speak(text).catch((e: Error) => pushError(e.message));
+  /** @param afterCurrent 즉시 응답 멘트("네, 찾아볼게요")가 끝난 뒤에 이어서 재생 */
+  function playSpeech(text: string, afterCurrent = false) {
+    speak(text, { afterCurrent }).catch((e: Error) => pushError(e.message));
   }
 
   function apply(res: QueryResponse, withSpeech: boolean) {
     // "처음부터 다시" 등으로 조건이 모두 비면 이어지는 조건도 비운다.
     setCriteria(!res.result && isEmptyCriteria(res.criteria) ? null : res.criteria);
     push({ role: "assistant", text: res.reply, speech: res.speech, notices: res.notices, suggestions: res.clarification?.suggestions, result: res.result });
-    if (withSpeech && voiceReply && aiEnabled) playSpeech(res.speech);
+    if (withSpeech && voiceReply && aiEnabled) playSpeech(res.speech, true);
   }
 
   async function ask(text: string, viaVoice = false) {
     unlockAudio();
-    stopSpeaking();
+    // 음성으로 물으면 바로 "네, 찾아볼게요"로 응답해 검색하는 동안 기다리는 느낌을 줄인다.
+    if (viaVoice && voiceReply && aiEnabled) playAck();
+    else stopSpeaking();
     setDevOpen(false);
     push({ role: "user", text, voice: viaVoice });
     setBusy(true);
@@ -178,7 +181,7 @@ export function App() {
                     busy={busy}
                     canSpeak={aiEnabled}
                     canAsk={aiEnabled}
-                    onSpeak={playSpeech}
+                    onSpeak={(t) => playSpeech(t)}
                     onSelect={select}
                     onShowAll={(result) => setSheet({ kind: "all", result })}
                     onSearch={search}

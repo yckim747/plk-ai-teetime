@@ -39,6 +39,8 @@ json(`${FN}/.vc-config.json`, {
   handler: "index.mjs",
   launcherType: "Nodejs",
   shouldAddHelpers: false,
+  // 음성 답변을 만드는 대로 흘려보내기 위해 (모아서 한 번에 보내지 않게)
+  supportsResponseStreaming: true,
   maxDuration: 60,
 });
 json(`${OUT}/config.json`, {
