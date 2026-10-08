@@ -7,6 +7,7 @@ import { matchClub, normalizeCriteria } from "../server/catalog";
 import type { QueryParser } from "../server/nlu/parseQuery";
 import { buildSystemPrompt } from "../server/nlu/parseQuery";
 import { buildSpeech, speakDate, speakFee, speakTime } from "../server/reply";
+import { teeTimeSpeech } from "../shared/speech";
 import { matches } from "../server/search/filter";
 import { pickTop, rankTeeTimes, sortForList } from "../server/search/recommend";
 import { featuredSections, upcomingWeekend } from "../server/search/featured";
@@ -187,6 +188,13 @@ describe("음성 답변 문장", () => {
     assert.equal(speakFee(195000), "그린피 19만 5천원");
     assert.equal(speakFee(190000), "그린피 19만원");
     assert.equal(speakFee(null), "그린피는 별도 문의");
+  });
+  it("카드 상세 안내 문장", () => {
+    assert.equal(
+      teeTimeSpeech({ club: "베어포트리조트CC(구.웅포)", date: "2026-10-11", time: "07:35", fee: 119000 }),
+      "베어포트리조트CC, 10월 11일 일요일 오전 7시 35분, 그린피 11만 9천원이에요. 예약하시려면 예약 요청 버튼을 눌러 주세요.",
+    );
+    assert.match(teeTimeSpeech({ club: "A", date: "2026-10-10", time: "13:00", fee: null }), /오후 1시, 그린피는 문의가 필요해요/);
   });
   it("괄호·기호 없이 추천과 화면 안내를 말한다", async () => {
     const source = new MemorySource(ROWS);

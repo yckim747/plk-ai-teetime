@@ -6,13 +6,15 @@ interface Props {
   rec: Recommendation;
   onMoreAtClub: (t: TeeTime) => void;
   onSimilar: (t: TeeTime) => void;
+  /** 예약 요청(데모)이 접수됐을 때 (음성 안내용) */
+  onRequested: () => void;
   onClose: () => void;
 }
 
 const PEOPLE = [1, 2, 3, 4];
 
 /** 티타임 상세 → 예약 요청(데모) → 접수 완료. 실제 예약·결제는 하지 않고 서버로 보내지도 않는다. */
-export function TeeTimeDetail({ rec, onMoreAtClub, onSimilar, onClose }: Props) {
+export function TeeTimeDetail({ rec, onMoreAtClub, onSimilar, onRequested, onClose }: Props) {
   const t = rec.teeTime;
   const [step, setStep] = useState<"detail" | "request" | "done">("detail");
   const [people, setPeople] = useState(4);
@@ -80,7 +82,14 @@ export function TeeTimeDetail({ rec, onMoreAtClub, onSimilar, onClose }: Props) 
             예상 그린피 합계 <strong>{(t.fee * people).toLocaleString("ko-KR")}원</strong>
           </p>
         )}
-        <button type="button" className="btn primary block" onClick={() => setStep("done")}>
+        <button
+          type="button"
+          className="btn primary block"
+          onClick={() => {
+            setStep("done");
+            onRequested();
+          }}
+        >
           예약 요청하기
         </button>
         <button type="button" className="btn ghost block" onClick={() => setStep("detail")}>

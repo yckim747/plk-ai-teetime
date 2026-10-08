@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { formatDate } from "../shared/format";
+import { teeTimeSpeech } from "../shared/speech";
 import type { CatalogInfo, FeaturedSection, QueryResponse, Recommendation, SearchCriteria, SearchResult, TeeTime } from "../shared/types";
 import { api } from "./api";
 import { AllResultsSheet } from "./components/AllResultsSheet";
@@ -160,7 +161,20 @@ export function App() {
       { dates: [t.date], regions: [t.region], clubs: [], timeFrom: shiftTime(t.time, -60), timeTo: shiftTime(t.time, 60), preferredTime: t.time, sort: "recommend" },
       `${formatDate(t.date)} ${t.region} ${t.time} 전후 비슷한 티타임`,
     );
-  const select = (rec: Recommendation) => setSheet({ kind: "detail", rec });
+  /** 카드를 누르면 상세를 열고, 음성 답변이 켜져 있으면 내용을 읽어 준다 (재생에는 마이크 권한이 필요 없다) */
+  const select = (rec: Recommendation) => {
+    unlockAudio();
+    stopSpeaking();
+    setSheet({ kind: "detail", rec });
+    if (voiceReply && aiEnabled) playSpeech(teeTimeSpeech(rec.teeTime));
+  };
+  const closeDetail = () => {
+    stopSpeaking();
+    setSheet(null);
+  };
+  const onRequested = () => {
+    if (voiceReply && aiEnabled) playSpeech("예약 요청이 접수되었어요.");
+  };
   const openFilter = () => setSheet({ kind: "filter" });
 
   return (
@@ -232,8 +246,8 @@ export function App() {
       <Composer disabled={!aiEnabled} busy={busy} onSend={ask} onError={pushError} onOpenFilter={openFilter} />
 
       {sheet?.kind === "detail" && (
-        <Sheet title="티타임 상세" onClose={() => setSheet(null)}>
-          <TeeTimeDetail rec={sheet.rec} onMoreAtClub={moreAtClub} onSimilar={similar} onClose={() => setSheet(null)} />
+        <Sheet title="티타임 상세" onClose={closeDetail}>
+          <TeeTimeDetail key={sheet.rec.teeTime.id} rec={sheet.rec} onMoreAtClub={moreAtClub} onSimilar={similar} onRequested={onRequested} onClose={closeDetail} />
         </Sheet>
       )}
       {sheet?.kind === "filter" && catalog && (
