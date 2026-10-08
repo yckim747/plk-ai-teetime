@@ -19,7 +19,7 @@ export function Home({ featured, aiEnabled, onSelect, onMore, onAsk }: Props) {
       <div className="greet">
         <h1>어떤 티타임을 찾으세요?</h1>
         <p>
-          {aiEnabled ? "아래 🎤를 누르고 말하거나 입력하면, 실시간 잔여 티타임에서 찾아드려요." : "지금은 AI 문의를 쓸 수 없어요. 아래 추천 티타임을 이용해 주세요."}
+          {aiEnabled ? "아래 마이크 버튼을 누르고 말하거나 입력하면, 실시간 잔여 티타임에서 찾아드려요." : "지금은 AI 문의를 쓸 수 없어요. 아래 추천 티타임을 이용해 주세요."}
         </p>
       </div>
 
