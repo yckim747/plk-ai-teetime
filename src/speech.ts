@@ -24,6 +24,12 @@ export function unlockAudio() {
   }
 }
 
+/** 마이크 음량 측정에도 같은 AudioContext를 쓴다 (iOS는 동시에 여러 개를 쓰기 어렵다) */
+export function getAudioContext(): AudioContext | null {
+  unlockAudio();
+  return ctx;
+}
+
 export function stopSpeaking() {
   token++;
   try {

@@ -59,7 +59,7 @@ export function Chat({ messages, busy, aiEnabled, onAsk, onError, onSpeak, onSho
             </p>
             {aiEnabled && (
               <p className="voice-hint">
-                <span className="mic-icon">🎤</span> 아래 마이크 버튼을 누르고 말한 뒤, 다시 누르면 바로 찾아드려요.
+                <span className="mic-icon">🎤</span> 마이크를 누르고 말씀하시면, 말이 끝날 때 자동으로 찾아드려요.
               </p>
             )}
             <div className="chips">
